@@ -103,6 +103,7 @@ section {
 }
 section p,
 section ul,
+section a,
 section ol {
   /* Adjust the styles as needed */
   font-size: 16px;
