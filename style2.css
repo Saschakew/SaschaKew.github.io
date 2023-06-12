@@ -101,14 +101,12 @@ section {
 h2 {
     color: #333;
 }
-
  
   
   .list-content {
     margin-bottom: 10px;
   }
   
-
   .abstract-toggle {
     margin-bottom: 5px;
   }
@@ -251,4 +249,22 @@ display: block;
         flex-direction: column; /* Display menu items vertically */
         align-items: center; /* Center the menu items vertically */
     }
+}
+
+@media (max-width: 600px) {
+    body {
+      font-size: 16px;
+    }
+  }
+
+@media (max-width: 600px) {
+.menu {
+    display: none;
+    text-align: center;
+}
+
+.menu.collapsible{
+    display: block;
+    text-align: center;
+}
 }
