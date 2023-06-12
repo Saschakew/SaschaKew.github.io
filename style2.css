@@ -3,6 +3,7 @@ body {
     margin: 0;
     padding: 0;
     background-color: #f9f9f9; 
+    font-size: 16px;
 }
 
  
@@ -251,20 +252,4 @@ display: block;
     }
 }
 
-@media (max-width: 600px) {
-    body {
-      font-size: 16px;
-    }
-  }
 
-@media (max-width: 600px) {
-.menu {
-    display: none;
-    text-align: center;
-}
-
-.menu.collapsible{
-    display: block;
-    text-align: center;
-}
-}
