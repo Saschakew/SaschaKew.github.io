@@ -101,12 +101,14 @@ section {
     display: flex;
     flex-direction: column;
 }
+
+menu a,
 section p,
 section ul,
-section a,
+section a, 
 section ol {
   /* Adjust the styles as needed */
-  font-size: 16px;
+  font-size: 16px !important;
 }
 
 h2 {
