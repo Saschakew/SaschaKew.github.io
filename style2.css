@@ -1,0 +1,254 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f9f9f9; 
+}
+
+ 
+
+.topheader { 
+    background-color: #ffa500;
+    color: #fff; 
+    text-align: center;
+    padding: 20px;
+}
+
+
+.fixed-menu {
+    list-style-type: none; 
+    padding: 20px;
+    background-color: #ffa500;
+    color: #fff; 
+    text-align: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;    
+}
+ 
+
+.menu { 
+    padding: 20px;
+    background-color: #ffa500;
+    color: #fff;  
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;  
+}
+
+.menu li {
+    display: inline;
+    margin-right: 5px;
+    padding: 8px 12px; /* Add vertical padding */
+}
+
+.menu li a {
+    text-decoration: none;
+    color: #333;
+    padding: 8px 12px; /* Add vertical padding */
+    border-radius: 5px; /* Add border radius */
+    transition: background-color 0.3s; /* Add transition effect */
+}
+.menu li a:hover {
+    background-color: #e5e5e5; /* Add hover background color */
+}
+
+
+.menu-toggle {
+    display: none;
+    cursor: pointer;
+    position: fixed;
+    top: 0;
+    padding: 5px;
+    background-color: #f5f5f5;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 999;
+}
+
+.menu-toggle span {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background-color: #333;
+    margin-bottom: 4px;
+}
+
+.menu.collapsible {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.menu.collapsible li {
+    display: block;
+    margin-right: 0;
+    margin-bottom: 10px;
+}
+
+
+ 
+
+section { 
+    max-width: 800px;
+    margin: 20px auto; 
+    padding: 20px;
+    background-color: #fff;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+    color: #333;
+}
+
+ 
+  
+  .list-content {
+    margin-bottom: 10px;
+  }
+  
+
+  .abstract-toggle {
+    margin-bottom: 5px;
+  }
+  
+  .list-footer {
+    text-align: center;
+  }
+
+  
+.paper-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+.paper-list li {
+    margin-bottom: 20px;
+    padding: 20px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.paper-list li h3 {
+    margin: 0;
+    font-size: 20px;
+    color: #333;
+}
+
+.paper-list li p {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+}
+
+.paper-list li a {
+    color: #ffa500;
+    text-decoration: none;
+}
+
+.paper-list li a:hover {
+    text-decoration: underline;
+}
+
+
+h3 {
+    margin: 0;
+    color: #333;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+    margin-right: 10px;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.intro {
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #fff;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.content {
+    display: flex;
+    align-items: flex-start; /* Align items at the top */
+}
+
+.content img {
+    width: 200px;
+    height: auto;
+    margin-right: 20px;
+}
+
+.content .text {
+    display: flex;
+    flex-direction: column; /* Arrange text vertically */
+    margin: 0; /* Remove any default margin */
+}
+
+.content .text p {
+    margin: 0; /* Remove any default margin */
+    margin-bottom: 10px;
+}
+
+.content .text a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.content .text a:hover {
+    text-decoration: underline;
+}
+  
+.abstract {
+    display: none;
+  }
+
+  
+.abstract-toggle {
+    cursor: pointer;
+    color: #007bff;
+    text-decoration: underline;
+    margin-top: 10px;
+  }
+  
+.abstract-toggle:hover {
+color: #0056b3;
+}
+
+.show {
+display: block;
+}
+  
+  
+  
+/* Media Query for smaller screens */
+@media (max-width: 600px) {
+    .menu li {
+        display: none; /* Hide menu items by default */
+    }
+
+    .menu-toggle {
+        display: block; /* Show menu toggle */
+        margin-right: 10px;
+    }
+
+    .menu.collapsible li {
+        display: block; /* Show menu items when expanded */
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+
+    .menu.collapsible {
+        flex-wrap: nowrap; /* Prevent menu items from wrapping */
+        flex-direction: column; /* Display menu items vertically */
+        align-items: center; /* Center the menu items vertically */
+    }
+}

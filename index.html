@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Academic Webpage</title>
+    <link rel="stylesheet" href="style2.css">
+</head>
+<body>
+    <header class="topheader">
+        <h1>Sascha Keweloh</h1>
+    </header>
+    <header>
+        <nav>
+            <div class="menu-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <ul class="menu">
+                <li><a href="#intro">About Me</a></li>
+                <li><a href="#research">Published Research</a></li>
+                <li><a href="#progress">Work in Progress</a></li>
+                <!-- <li><a href="#svarpy">SVAR Python</a></li> -->
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="intro" class="intro">
+            <h2>About Me</h2>
+            <div class="content">
+                <img src="foto.jpg" alt="Profile Picture">
+                <div class="text">
+                    <p>I am a Postdoc at the TU Dortmund University.</p>
+                    <p>Research interests: Macroeconometrics, Time Series Econometrics</p>
+                    <p>Contact: <a href="mailto:	sascha.keweloh@tu-dortmund.de">	sascha.keweloh@tu-dortmund.de</a></p>
+                    <p>CV: <a href="cv.pdf" target="_blank">Link</a></p>
+                </div>
+            </div>
+        </section>
+        
+        <section id="research">
+            <h2>Published Research</h2>
+            <ul class="paper-list">
+                <li>
+                    <h3>A Generalized Method of Moments Estimator for Structural Vector Autoregressions Based on Higher Moments</h3> 
+                    <p>Journal of Business & Economic Statistics</p> 
+                    <p class="abstract-toggle"><a href="#">Abstract</a></p>
+
+
+                    <div class="abstract">
+                      <p>
+                        I propose a generalized method of moments estimator for structural vector autoregressions with independent and non-Gaussian shocks. The shocks are identified by exploiting information contained in higher moments of the data. Extending the standard identification approach, which relies on the covariance, to the coskewness and cokurtosis allows the simultaneous interaction to be identified and estimated without any further restrictions. I analyze the finite sample properties of the estimator and apply it to illustrate the simultaneous interaction between economic activity, oil, and stock prices.
+                      </p>
+                    </div>
+                    <p class="list-footer">
+                        <a href="https://amstat.tandfonline.com/doi/full/10.1080/07350015.2020.1730858" target="_blank">Paper</a> |
+                        <a href="https://amstat.tandfonline.com/doi/suppl/10.1080/07350015.2020.1730858?scroll=top&role=tab&aria-labelledby=suppl" target="_blank">Online Appendix</a> |
+                        <a href="paper1-replication.zip" target="_blank">Replication Files</a>
+                      </p>
+ 
+                </li>
+                <li>
+                    <h3>Monetary Policy and Information Shocks in a Block-Recursive SVAR</h3> 
+                    <p>Accepted: Journal of International Money and Finance</p>
+                    <p>(with Stephan Hetzenecker and Andre Seepe)</p>
+                    <p class="abstract-toggle"><a href="#">Abstract</a></p>
+                    <div class="abstract">
+                        <p>
+                            This study   introduces a new estimator that  combines block-recursive restrictions with higher-order moment conditions and non-Gaussian shocks. 
+                            The proposed  estimator improves the accuracy of the estimation, simplifies labeling, and allows for relaxing  the independence and non-Gaussianity assumptions in comparison to a purely data-driven approach.
+                            We use the approach to disentangle the interaction of stock prices and interest rates into  monetary policy and stock market information shocks. 
+                            We find that traditional monetary policy shocks move interest rates and stock prices in opposite directions, whereas   information shocks move both variables in the same direction.
+                            Moreover, we utilize high-frequency data from FOMC announcements to derive a proxy for central bank information shocks and show that these shocks are statistically relevant for the low-frequency stock market information shock.
+                        </p>
+                    </div>
+                    <p class="list-footer">
+                        <!--<a href="paper2.pdf" target="_blank">Paper</a> |
+                        <a href="paper2-appendix.pdf" target="_blank">Online Appendix</a> |
+                        <a href="paper2-replication.zip" target="_blank">Replication Files</a>-->
+                    </p>
+                </li>
+                <!-- Add more papers here -->
+            </ul>
+        </section>
+
+        <section id="progress">
+            <h2>Work in Progress</h2>
+            <ul class="paper-list">
+                <li>
+                    <h3>Uncertain Prior Economic Knowledge and Statistically Identified Structural Vector Autoregressions</h3>
+                    <p class="abstract-toggle"><a href="#">Abstract</a></p>
+                    <div class="abstract">
+                        <p>
+                            This study proposes an estimator that combines statistical identification with economically motivated restrictions on the interactions. The estimator is identified by (mean) independent non-Gaussian shocks and allows for incorporation of uncertain prior economic knowledge through an adaptive ridge penalty. The estimator shrinks towards economically motivated restrictions when the data is consistent with them and stops shrinkage when the data provides evidence against the restriction. The estimator is applied to analyze the interaction between the stock and oil market. The results suggest that what is usually identified as oil-specific demand shocks can actually be attributed to information shocks extracted from the stock market, which explain about 30-40% of the oil price variation.
+                        </p>
+                    </div>  
+                    <p class="list-footer">
+                        <a href="https://arxiv.org/pdf/2303.13281" target="_blank">Paper</a>
+                        | <a href="https://www.youtube.com/watch?v=iBDhjJ0_vlY&t=949s" target="_blank">Presentation (VTSS)</a>
+                        <!-- | <a href="paper1-replication.zip">Replication Files</a>-->
+                    </p>
+                </li>
+                <li>
+                    <h3>Estimating the Effects of Fiscal Policy using a Novel Proxy Shrinkage Prior</h3>  
+                    <p>(with Mathias Klein and Jan Prüser)</p>
+                    <p class="abstract-toggle"><a href="#">Abstract</a></p>
+                    <div class="abstract">
+                        <p>
+                            This study proposes an estimator that combines statistical identification with economically motivated restrictions on the interactions. The estimator is identified by (mean) independent non-Gaussian shocks and allows for incorporation of uncertain prior economic knowledge through an adaptive ridge penalty. The estimator shrinks towards economically motivated restrictions when the data is consistent with them and stops shrinkage when the data provides evidence against the restriction. The estimator is applied to analyze the interaction between the stock and oil market. The results suggest that what is usually identified as oil-specific demand shocks can actually be attributed to information shocks extracted from the stock market, which explain about 30-40% of the oil price variation.
+                        </p>
+                    </div>
+                    <p class="list-footer">
+                        <a href="https://arxiv.org/pdf/2302.13066" target="_blank">Paper</a> 
+                        <!-- | <a href="paper1-replication.zip">Replication Files</a>-->
+                    </p>
+                </li>
+                <li>
+                    <h3>A feasible approach to incorporate information in higher moments in structural vector autoregressions</h3>   
+                    <p class="abstract-toggle"><a href="#">Abstract</a></p>
+                    <div class="abstract">
+                        <p>
+                            Generalized method of moments and continuous updating estimators based on second- to fourth-order moment conditions can be used to solve the identification problem and estimate non-Gaussian structural vectorautoregressions. However, estimating the asymptotically optimal weighting matrix and the asymptotic variance of the estimators is challenging in small samples. I show that this can lead to a severe bias, large variance, and inaccurate inference in small samples. I propose to use the assumption of independent structural shocks not only to derive moment conditions but also to derive alternative estimators for the asymptotically optimal weighting matrix and the asymptotic variance of the estimator. I demonstrate that these estimators greatly improve the performance of the generalized method of moments and continuous updating estimators in terms of bias, variance, and inference.
+                        </p>
+                    </div>
+                    <p class="list-footer">
+                        <a href="http://129.217.131.68:8080/bitstream/2003/40547/1/DP_2221_SFB823_Keweloh.pdf" target="_blank">Paper</a> 
+                        <!-- | <a href="paper1-replication.zip">Replication Files</a>-->
+                    </p>
+                </li>
+        </section>
+ 
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
