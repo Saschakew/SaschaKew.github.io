@@ -15,6 +15,12 @@ body {
     padding: 20px;
 }
 
+.abstract-toggle,
+.journal-info,
+.author-info {
+    display: inline;
+    margin: 0;
+}
 
 .fixed-menu {
     list-style-type: none; 
