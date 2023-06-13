@@ -113,33 +113,33 @@ a:hover {
 
  
 
-.content {
+.AboutMe {
     display: flex;
     align-items: flex-start; /* Align items at the top */
 }
 
-.content img {
+.AboutMe img {
     width: 200px;
     height: auto;
     margin-right: 20px;
 }
 
-.content .text { 
+.AboutMe .text { 
     flex-direction: column; /* Arrange text vertically */
     margin: 0; /* Remove any default margin */
 }
 
-.content .text p {
+.AboutMe .text p {
     margin: 0; /* Remove any default margin */
     margin-bottom: 10px;
 }
 
-.content .text a {
+.AboutMe .text a {
     color: #007bff;
     text-decoration: none;
 }
 
-.content .text a:hover {
+.AboutMe .text a:hover {
     text-decoration: underline;
 }
   
