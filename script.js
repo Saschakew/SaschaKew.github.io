@@ -1,5 +1,5 @@
 $(document).ready(function() {
   $('.abstract-toggle').click(function() {
-    $(this).closest('li').find('.abstract').toggle();
+    $(this).siblings('.abstract').toggle();
   });
 });
