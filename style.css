@@ -104,7 +104,6 @@ h3 {
 a {
     color: #007bff;
     text-decoration: none;
-    margin-right: 10px;
 }
 
 a:hover {
@@ -137,6 +136,7 @@ a:hover {
 .AboutMe .text a {
     color: #007bff;
     text-decoration: none;
+    margin-right: 10px;
 }
 
 .AboutMe .text a:hover {
