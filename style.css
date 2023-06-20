@@ -62,13 +62,16 @@ margin-bottom: 5px;
 text-align: center;
 }
 
+ 
   
-.paper-list {
+.paper-list,
+.notebook-list {
     list-style-type: none;
     padding: 0;
 }
 
-.paper-list li {
+.paper-list li,
+.notebook-list li{
     margin-bottom: 20px;
     padding: 20px;
     background-color: #fff;
@@ -76,22 +79,26 @@ text-align: center;
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
 }
 
-.paper-list li h3 {
+.paper-list li h3, 
+.notebook-list li h3{
     margin: 0; 
     color: #333;
 }
 
-.paper-list li p {
+.paper-list li p,
+.notebook-list  li p{
     margin: 0; 
     color: #666;
 }
 
-.paper-list li a {
+.paper-list li a,
+.notebook-list li a{
     color: #ffa500;
     text-decoration: none;
 }
 
-.paper-list li a:hover {
+.paper-list li a:hover,
+.notebook-list li a:hover{
     text-decoration: underline;
 }
 
@@ -102,7 +109,7 @@ h3 {
 }
 
 a {
-    color: #007bff;
+    color: #ffa500;
     text-decoration: none;
 }
 
@@ -134,7 +141,7 @@ a:hover {
 }
 
 .AboutMe .text a {
-    color: #007bff;
+    color: #ffa500;
     text-decoration: none;
     margin-right: 10px;
 }
@@ -153,21 +160,58 @@ a:hover {
   
 .abstract-toggle {
     cursor: pointer;
-    color: #007bff;
+    color: #ffa500;
     text-decoration: underline;
     margin-top: 10px;
   }
   
 .abstract-toggle:hover {
-color: #0056b3;
+color: #ffa500;
 }
 
 .show {
 display: block;
 }
-  
-  
+   
+/* Collapsible content styles */
+.collapsed {
+    display: none;
+  }
   
  
+/* Collapsible container styles */
+.collapse-container {
+    display: flex;
+    align-items: center;
+  }
+  
+  /* Arrow button styles */
+  .arrow-button {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
 
-
+  .arrow-button:hover { 
+    color: #ffa500;
+  }
+  
+  /* Arrow icon styles */
+  .arrow-icon {
+    width: 12px;
+    height: 12px;
+    border: solid;
+    border-width: 0 2px 2px 0;
+    display: inline-block;
+    transform: rotate(45deg);
+    transition: transform 0.3s ease;
+  }
+  
+  /* Arrow icon rotation for the expanded state */
+  .arrow-button.expanded .arrow-icon {
+    transform: rotate(-135deg);
+  }
+  
+  
+  
