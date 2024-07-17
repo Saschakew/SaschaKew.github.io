@@ -1,6 +1,7 @@
 // Global variables
 let charts = {};
 let epsilon1, epsilon2, u1, u2;
+let selectedPointIndex = null;
 
 // DOM Content Loaded Event Listener
 document.addEventListener('DOMContentLoaded', function() {
@@ -119,23 +120,24 @@ function setupEventListeners() {
       document.getElementById('phi0Value').textContent = phi0Value.toFixed(2);
       updateAllMatrices(phi0Value,phiValue); 
         updateChartWithPhi();    
+        updateSelectedPoints(); 
       });
     }
 
 
 
-  const phiElement = document.getElementById('phi');
-  if (phiElement) {
-  document.getElementById('phi').addEventListener('input', function() {
-    const phiValue = parseFloat(this.value);
-    document.getElementById('phiValue').textContent = phiValue.toFixed(2);
-  updateAllMatrices(phi0Value,phiValue);
-      
-      updateChartWithPhi();   
-      updateLossPlot();  // Add this line
-      updateLossPlotm();  // Add this line 
-    });
-  }
+    const phiElement = document.getElementById('phi');
+    if (phiElement) {
+      phiElement.addEventListener('input', function() {
+        const phiValue = parseFloat(this.value);
+        document.getElementById('phiValue').textContent = phiValue.toFixed(2);
+        updateAllMatrices(phi0Value, phiValue);
+        updateChartWithPhi();
+        updateLossPlotm();  // Add this line 
+        updateLossPlot();  // Add this line
+        // The selected point is maintained within updateChartWithPhi
+      });
+    }
  
   const TElement = document.getElementById('T');
   if (TElement) {
@@ -229,6 +231,18 @@ function setupEventListeners() {
   });
 
 
+
+  ['scatterPlot1', 'scatterPlot2'].forEach(id => {
+    const canvas = document.getElementById(id);
+    if (canvas) {
+      canvas.addEventListener('click', function(event) {
+        console.log(`Canvas ${id} clicked`);
+        const chart = charts[id];
+        const elements = chart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, false);
+        handleChartClick(event, elements, chart);
+      });
+    }
+  });
 }
 
 
@@ -242,10 +256,18 @@ function initializeCharts() {
       datasets: [{
         label: 'Data',
         data: [],
-        backgroundColor: 'rgba(255, 165, 0, 0.6)'
+        backgroundColor: 'rgba(255, 165, 0, 0.6)',
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }, {
+        label: 'Selected Point',
+        data: [],
+        backgroundColor: 'red',
+        pointRadius: 7,
+        pointHoverRadius: 9
       }]
     },
-    options: {
+    options: { 
       responsive: true,
       maintainAspectRatio: true,
       aspectRatio: 1,
@@ -272,21 +294,27 @@ function initializeCharts() {
             font: { size: 16 }
           }
         }
-      }
+      } 
     }
-    
   };
 
-  function createChartIfExists(id) {
-    const element = document.getElementById(id);
-    if (element) {
-      const ctx = element.getContext('2d');
-      charts[id] = new Chart(ctx, JSON.parse(JSON.stringify(chartConfig)));
-    }
-  }
 
-  createChartIfExists('scatterPlot1');
-  createChartIfExists('scatterPlot2');
+
+
+
+function createChartIfExists(id) {
+  const element = document.getElementById(id);
+  if (element) {
+    const ctx = element.getContext('2d');
+    charts[id] = new Chart(ctx, JSON.parse(JSON.stringify(chartConfig)));
+    console.log(`Chart ${id} created`);
+  } else {
+    console.log(`Element with id ${id} not found`);
+  }
+}
+
+createChartIfExists('scatterPlot1');
+createChartIfExists('scatterPlot2');
   createChartIfExists('scatterPlot3');
 
   const lossplot4Element = document.getElementById('lossplot4');
@@ -304,8 +332,8 @@ function initializeCharts() {
         }, {
           label: 'Current φ',
           data: [],
-          borderColor: 'rgb(255, 99, 132)',
-          backgroundColor: 'rgb(255, 99, 132)',
+          borderColor: '#ffa500',
+          backgroundColor: '#ffa500',
           pointRadius: 6,
           pointHoverRadius: 8,
           showLine: false
@@ -366,8 +394,8 @@ function initializeCharts() {
         }, {
           label: 'Current φ',
           data: [],
-          borderColor: 'rgb(255, 99, 132)',
-          backgroundColor: 'rgb(255, 99, 132)',
+          borderColor: '#ffa500',
+          backgroundColor: '#ffa500',
           pointRadius: 6,
           pointHoverRadius: 8,
           showLine: false
@@ -407,16 +435,16 @@ function initializeCharts() {
         }
       }
     });
-    console.log('lossplot4 chart created');
+    console.log('lossplot4m chart created');
   } else {
-    console.log('lossplot4 element not found');
+    console.log('lossplot4m element not found');
   }
   
 }
 
 function updateAllCharts() {
   if (charts.scatterPlot1) {
-    updateChart(charts.scatterPlot1, epsilon1, epsilon2, "Structural Shocks", "ε₁", "ε₂");
+    updateChartScatter(charts.scatterPlot1, epsilon1, epsilon2, "Structural Shocks", "ε₁", "ε₂");
   }
   updateChartWithPhi();
   updateLossPlotm();
@@ -511,7 +539,37 @@ function animateBallRolling(lossType) {
   animate();
 }
 
+function handleChartClick(event, elements, chart) {
+  console.log('Chart clicked');
+  if (elements.length > 0) {
+    selectedPointIndex = elements[0].index;
+    highlightPointOnAllCharts(selectedPointIndex);
+  }
+}
 
+function highlightPointOnAllCharts(index) {
+  if (charts.scatterPlot1) highlightPoint(charts.scatterPlot1, index);
+  if (charts.scatterPlot2) highlightPoint(charts.scatterPlot2, index);
+  if (charts.scatterPlot3) highlightPoint(charts.scatterPlot3, index);
+}
+  // Add this function to highlight a specific point
+function highlightPoint(chart, index) {
+  const selectedDataset = chart.data.datasets[1];
+  selectedDataset.data = [chart.data.datasets[0].data[index]];
+  chart.update();
+}
+function highlightPoint(chart, index) {
+  const mainDataset = chart.data.datasets[0];
+  const selectedDataset = chart.data.datasets[1];
+  
+  if (index !== null && index < mainDataset.data.length) {
+    selectedDataset.data = [mainDataset.data[index]];
+  } else {
+    selectedDataset.data = [];
+  }
+  
+  chart.update();
+}
 function updateLossPlot() {
   if (charts && charts.lossplot4 && u1 && u2) {
     const currentPhi = parseFloat(document.getElementById('phi').value);
@@ -531,10 +589,37 @@ function updateLossPlot() {
 
     // Update the phi0 point
     const phi0Loss = myloss(u1, u2, phi0);
-    charts.lossplot4.data.datasets[2].data = [{
-      x: phi0,
-      y: phi0Loss
-    }];
+const yMin = Math.min(0,...charts.lossplot4.data.datasets[0].data.map(point => point.y));
+const yMax = Math.max(0.5,...charts.lossplot4.data.datasets[0].data.map(point => point.y));
+
+charts.lossplot4.data.datasets[2] = {
+  type: 'line',
+  label: 'φ₀',
+  data: [
+    { x: phi0, y: yMin },
+    { x: phi0, y: yMax }
+  ],
+  borderColor: '#ffa500',
+  borderWidth: 2,
+  pointRadius: 0,
+  animation: false
+};
+
+charts.lossplot4.options.annotation = {
+  annotations: [{
+    type: 'line',
+    mode: 'vertical',
+    scaleID: 'x',
+    value: phi0,
+    borderColor: '#ffa500',
+    borderWidth: 2,
+    label: {
+      content: 'φ₀',
+      enabled: false,
+      position: 'top'
+    }
+  }]
+};
 
     charts.lossplot4.options.scales.x = {
       type: 'linear',
@@ -604,12 +689,39 @@ function updateLossPlotm() {
       y: currentLoss
     }];
 
-    // Update the phi0 point
-    const phi0Loss = mylossm(u1, u2, phi0);
-    charts.lossplot4m.data.datasets[2].data = [{
-      x: phi0,
-      y: phi0Loss
-    }];
+      // Update the phi0 point
+      const phi0Loss = mylossm(u1, u2, phi0);
+      const yMin = Math.min(0,...charts.lossplot4m.data.datasets[0].data.map(point => point.y));
+      const yMax = Math.max(0.5,...charts.lossplot4m.data.datasets[0].data.map(point => point.y));
+      
+      charts.lossplot4m.data.datasets[2] = {
+        type: 'line',
+        label: 'φ₀',
+        data: [
+          { x: phi0, y: yMin },
+          { x: phi0, y: yMax }
+        ],
+        borderColor: '#ffa500',
+        borderWidth: 2,
+        pointRadius: 0,
+        animation: false
+      };
+      
+      charts.lossplot4m.options.annotation = {
+        annotations: [{
+          type: 'line',
+          mode: 'vertical',
+          scaleID: 'x',
+          value: phi0,
+          borderColor: '#ffa500',
+          borderWidth: 2,
+          label: {
+            content: 'φ₀',
+            enabled: false,
+            position: 'top'
+          }
+        }]
+      };
 
     charts.lossplot4m.options.scales.x = {
       type: 'linear',
@@ -724,6 +836,8 @@ function generateNewData() {
     epsilon2[i] /= newVar2;
   }
    
+  selectedPointIndex = null;
+
   updateAllCharts();
 }
 
@@ -757,14 +871,13 @@ function normalRandom() {
 function updateChartWithPhi() {
   const phi0 = parseFloat(document.getElementById('phi0').value);
   const phi = parseFloat(document.getElementById('phi').value);
-  
 
   // Calculate u1 and u2
   u1 = epsilon1.map((e1, i) => e1 * Math.cos(phi0) - epsilon2[i] * Math.sin(phi0));
   u2 = epsilon1.map((e1, i) => e1 * Math.sin(phi0) + epsilon2[i] * Math.cos(phi0));
 
   if (charts.scatterPlot2) {
-    updateChart(charts.scatterPlot2, u1, u2, "Reduced Form Shocks", "u₁", "u₂", true);
+    updateChartScatter(charts.scatterPlot2, u1, u2, "Reduced Form Shocks", "u₁", "u₂", true);
   }
 
   // Calculate e1 and e2
@@ -772,10 +885,15 @@ function updateChartWithPhi() {
   const e2 = u1.map((u1, i) => -u1 * Math.sin(phi) + u2[i] * Math.cos(phi));
 
   if (charts.scatterPlot3) {
-    updateChart(charts.scatterPlot3, e1, e2, "Innovations", "e₁", "e₂", true);
+    updateChartScatter(charts.scatterPlot3, e1, e2, "Innovations", "e₁", "e₂", true);
   }
 
   calculateStats(epsilon1, epsilon2, u1, u2, e1, e2);
+  
+  // Maintain the selected point
+  if (selectedPointIndex !== null) {
+    highlightPointOnAllCharts(selectedPointIndex);
+  }
 }
 
  
@@ -820,12 +938,16 @@ function updateAllMatrices(phi0, phi) {
  
  
 
-function updateChart(chart, xData, yData, title, xLabel, yLabel, animate = false) {
-  if (!chart) return;  // Exit if the chart doesn't exist
+function updateChartScatter(chart, xData, yData, title, xLabel, yLabel, animate = false) {
+  if (!chart) return;
 
   const newData = xData.map((x, i) => ({x: x, y: yData[i]}));
 
   chart.data.datasets[0].data = newData;
+  
+  // The selected point will be updated in highlightPointOnBothCharts
+  chart.data.datasets[1].data = [];
+
   chart.options.plugins.title.text = title;
   chart.options.scales.x.title.text = xLabel;
   chart.options.scales.y.title.text = yLabel;
