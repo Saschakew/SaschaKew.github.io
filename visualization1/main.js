@@ -232,7 +232,7 @@ function setupEventListeners() {
 
 
 
-  ['scatterPlot1', 'scatterPlot2'].forEach(id => {
+  ['scatterPlot1', 'scatterPlot2', 'scatterPlot3'].forEach(id => {
     const canvas = document.getElementById(id);
     if (canvas) {
       canvas.addEventListener('click', function(event) {
@@ -519,7 +519,7 @@ function animateBallRolling(lossType) {
     if (leftLoss < currentLoss && leftLoss < rightLoss) {
       newPhi = Math.max(0, currentPhi - stepSize);
     } else if (rightLoss < currentLoss && rightLoss < leftLoss) {
-      newPhi = Math.min(0.78, currentPhi + stepSize);
+      newPhi = Math.min(1.57, currentPhi + stepSize);
     } else {
       console.log("Optima reached");
       removeEventListeners();
@@ -574,7 +574,7 @@ function updateLossPlot() {
   if (charts && charts.lossplot4 && u1 && u2) {
     const currentPhi = parseFloat(document.getElementById('phi').value);
     const phi0 = parseFloat(document.getElementById('phi0').value);
-    const xValues = Array.from({length: 79}, (_, i) => i * 0.01);
+    const xValues = Array.from({length: 159}, (_, i) => i * 0.01);
     const yValues = xValues.map(x => myloss(u1, u2, x));
 
     charts.lossplot4.data.labels = xValues.map(x => x.toFixed(2));
@@ -629,7 +629,7 @@ charts.lossplot4.options.annotation = {
         text: 'φ'
       },
       min: 0,
-      max: 0.78,
+      max: 1.57,
       ticks: {
         callback: function(value) {
           return value.toFixed(2);
@@ -676,7 +676,7 @@ function updateLossPlotm() {
   if (charts && charts.lossplot4m && u1 && u2) {
     const currentPhi = parseFloat(document.getElementById('phi').value);
     const phi0 = parseFloat(document.getElementById('phi0').value);
-    const xValues = Array.from({length: 79}, (_, i) => i * 0.01);
+    const xValues = Array.from({length: 159}, (_, i) => i * 0.01);
     const yValues = xValues.map(x => mylossm(u1, u2, x));
 
     charts.lossplot4m.data.labels = xValues.map(x => x.toFixed(2));
@@ -731,7 +731,7 @@ function updateLossPlotm() {
         text: 'φ'
       },
       min: 0,
-      max: 0.78,
+      max: 1.57,
       ticks: {
         callback: function(value) {
           return value.toFixed(2);
@@ -1069,40 +1069,40 @@ function createTable(data, title, symbol) {
     <tr>
       <td class="measure">Covariance</td>
       <td class="formula">mean(${symbol}₁ * ${symbol}₂)</td>
-      <td  class="value">${data.covariance.toFixed(4)}</td>
+      <td  class="value">${data.covariance.toFixed(2)}</td>
     </tr> 
     <tr>
       <td class="measure">Coskewness </td>
       <td class="formula">mean(${symbol}₁³ * ${symbol}₂)</td>
-      <td  class="value">${data.coskewness1.toFixed(4)}</td>
+      <td  class="value">${data.coskewness1.toFixed(2)}</td>
     </tr>
     <tr>
       <td class="measure">Coskewness </td>
       <td class="formula">mean(${symbol}₁ * ${symbol}₂³)</td>
-      <td  class="value">${data.coskewness2.toFixed(4)}</td>
+      <td  class="value">${data.coskewness2.toFixed(2)}</td>
     </tr>
     <tr>
       <td class="measure">Cokurtosis </td>
       <td class="formula">mean(${symbol}₁³ * ${symbol}₂)</td>
-      <td  class="value">${data.cokurtosis1.toFixed(4)}</td>
+      <td  class="value">${data.cokurtosis1.toFixed(2)}</td>
     </tr>
     <tr>
       <td class="measure">Cokurtosis </td>
       <td class="formula">mean(${symbol}₁ * ${symbol}₂³)</td>
-      <td  class="value">${data.cokurtosis2.toFixed(4)}</td>
+      <td  class="value">${data.cokurtosis2.toFixed(2)}</td>
     </tr>
     <tr>
       <td class="measure">Cokurtosis </td>
-      <td class="formula">mean(${symbol}₁² * ${symbol}₂²) - 1</td>
-      <td  class="value">${data.cokurtosis3.toFixed(4)}</td>
+      <td class="formula">mean(${symbol}₁² * ${symbol}₂² - 1 ) </td>
+      <td  class="value">${data.cokurtosis3.toFixed(2)}</td>
     </tr>
     <tr>
       <td class="measure">Loss</td>
-      <td class="formula">...</td>
-      <td  class="value">${data.loss.toFixed(4)}</td>
+      <td class="formula"> </td>
+      <td  class="value">${data.loss.toFixed(2)}</td>
     </tr>
   </table>
-  `;
+  `; 
 }
 
 function createAdditionalTable(data, title, symbol) {
@@ -1118,33 +1118,33 @@ function createAdditionalTable(data, title, symbol) {
     <tr>
       <td class="measure">Mean</td>
       <td class="formula">mean(${symbol}ᵢ²)</td>
-      <td>${data.mean1.toFixed(4)}</td>
-      <td>${data.mean2.toFixed(4)}</td>
+      <td>${data.mean1.toFixed(2)}</td>
+      <td>${data.mean2.toFixed(2)}</td>
     </tr> 
     <tr>
       <td class="measure">Variance</td>
       <td class="formula">mean(${symbol}ᵢ²)</td>
-      <td>${data.mean_squared1.toFixed(4)}</td>
-      <td>${data.mean_squared2.toFixed(4)}</td>
+      <td>${data.mean_squared1.toFixed(2)}</td>
+      <td>${data.mean_squared2.toFixed(2)}</td>
     </tr> 
     <tr>
       <td class="measure">Skewness</td>
       <td class="formula">mean(${symbol}ᵢ³)</td>
-      <td>${data.mean_cubed1.toFixed(4)}</td>
-      <td>${data.mean_cubed2.toFixed(4)}</td>
+      <td>${data.mean_cubed1.toFixed(2)}</td>
+      <td>${data.mean_cubed2.toFixed(2)}</td>
     </tr> 
     <tr>
       <td class="measure">Excess Kurtosis</td>
       <td class="formula">mean(${symbol}ᵢ⁴)-3</td>
-      <td>${data.mean_fourth1.toFixed(4)}</td>
-      <td>${data.mean_fourth2.toFixed(4)}</td>
+      <td>${data.mean_fourth1.toFixed(2)}</td>
+      <td>${data.mean_fourth2.toFixed(2)}</td>
     </tr>
     <tr>
       <td class="measure">Loss</td>
-      <td class="formula">...</td>
-      <td>${data.loss.toFixed(4)}</td>
+      <td class="formula"> </td>
+      <td>${data.loss.toFixed(2)}</td>
       <td> </td>
     </tr>
   </table>
-  `;
+  `; 
 }
