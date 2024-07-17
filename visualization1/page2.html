@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script>
+    MathJax = {
+        tex: {
+            inlineMath: [['$', '$'], ['\$', '\$']]
+        },
+        startup: {
+            pageReady: () => {
+                return MathJax.startup.defaultPageReady().then(() => {
+                    console.log('MathJax initial typesetting complete');
+                });
+            }
+        }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body  class="page2">
+  <header>
+    <h1>Visualization: Non-Gaussian SVAR</h1>
+  </header>
+
+  <main>
+    <div class="menu-bar">
+      <button id="menu-toggle" aria-label="Toggle menu">☰</button>
+    </div>
+    <nav>
+      <ul>
+      <li><a href="index.html">Setup</a></li>
+      <li><a href="page2.html" class="active">Reduced Form</a></li>
+      <li><a href="page3.html">Identification Problem</a></li>
+      <li><a href="page4.html">Min. Dependencies</a></li>
+      <li><a href="page5.html">Max. non-Gaussianity</a></li>
+      <li><a href="page6.html" >Non-Gaussianity</a></li>
+      </ul>
+      </nav>
+
+
+      <section class="input-container">
+        <div>
+          <label for="T">T =</label>
+          <input type="number" id="T" class="T-input" value="250" min="10" max="999">
+        </div>
+        <div>
+          <label for="phi0">φ₀ = </label>
+          <input type="range" id="phi0" value="0.5" min="0" max="1" step="0.1">
+          <div id="phi0Value">0.50</div>
+        </div>
+        <div> 
+          <input type="hidden" id="phi" min="0" max="0.78" step="0.01" value="0.">
+        
+        </div>
+        <button id="newDataBtn" class="orange-button">New Data</button>
+      </section>
+
+    <section class="text-container">
+      <p>Using the simplifications from the <a href="index.html">previous</a> page, the reduced form shocks $u_t$ and consequently the macroeconomnic variables $y_t$ can be thought of a with angle $\phi_0$ of the structural form shocks $\epsilon_t$:
+        $$   \begin{bmatrix} u_{1,t}   \\ u_{2,t}  \end{bmatrix} 
+        =  
+       \begin{bmatrix} \cos(\phi_0) & -\sin(\phi_0) \\ \sin(\phi_0) & \cos(\phi_0) \end{bmatrix}
+        \begin{bmatrix} \epsilon_{1,t}   \\ \epsilon_{2,t}  \end{bmatrix} 
+      $$
+        <span id="current-B0"></span>
+        
+      </p>
+      <p>
+        In the simulation below, the structural form shocks are independently drawn from a uniform distribution.<span class="info-icon" data-info="normalization....">i</span>
+        <br>
+        Move the $\phi_0$ slider above to see how $B(\phi_0)$ leads to different rotations $u_t$ of $\epsilon_t$.
+        <br>
+        Push the New-Data-Button to draw a new set of structural shocks $\epsilon_t$.
+      </p>
+      
+      <div id="current-B" style="display: none;"></div>
+    </section>
+
+    <div class="container">
+
+      <section class="chart-container" style="width: 49%; margin-right: 2%;">
+        <canvas id="scatterPlot1"></canvas>
+      </section>
+
+      <section class="chart-container" style="width: 49%;">
+        <canvas id="scatterPlot2"></canvas>
+      </section>
+
+
+    </div>
+
+  
+  <div class="text-container">
+    <p>
+      The <a href="page3.html">next</a> page illustrates the identification problem.
+    </p>
+    
+  </div>
+
+
+  </main>
+
+  <footer>
+    <div class="footer-container">
+        <a href="about.html">About</a>
+        <a href="https://sites.google.com/view/sascha-keweloh">Sascha Keweloh</a>
+    </div>
+</footer>
+  
+  <script  src="main.js"></script>
+</body>
+</html>

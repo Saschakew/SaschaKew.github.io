@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script>
+    MathJax = {
+        tex: {
+            inlineMath: [['$', '$'], ['\$', '\$']]
+        },
+        startup: {
+            pageReady: () => {
+                return MathJax.startup.defaultPageReady().then(() => {
+                    console.log('MathJax initial typesetting complete');
+                });
+            }
+        }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="page6">
+  <header>
+    <h1>Visualization: Non-Gaussian SVAR</h1>
+  </header>
+
+  <main>  
+    <div class="menu-bar">
+      <button id="menu-toggle" aria-label="Toggle menu">☰</button>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="index.html">Setup</a></li>
+        <li><a href="page2.html">Reduced Form</a></li>
+        <li><a href="page3.html">Identification Problem</a></li>
+        <li><a href="page4.html">Min. Dependencies</a></li>
+        <li><a href="page5.html">Max. non-Gaussianity</a></li>
+        <li><a href="page6.html" class="active">Non-Gaussianity</a></li>
+      </ul>
+    </nav>
+
+    
+    <section class="input-container">
+      <div>
+        <label for="T">T =</label>
+        <input type="number" id="T" class="T-input" value="999" min="10" max="999">
+      </div>
+      <div>
+        <label for="phi0">φ₀ = 0.5</label>
+        <input type="hidden" id="phi0" value="0.5" min="0" max="1" step="0.1">
+      </div>
+      <div>
+        <label for="phi">φ =</label>
+        <input type="range" id="phi" min="0" max="0.78" step="0.01" value="0">
+      
+        <div id="phiValue">0.00</div>
+      </div>
+      <div  >
+        <label for="sSlider">s =</label> 
+        <input type="range" id="sSlider" min="-5" max="5" step="0.1" value="0">
+        <span id="sValue">0.00</span>
+      </div>
+      <button id="newDataBtn" class="orange-button">New Data</button>
+    </section>
+
+    <section id="formula-container">
+      <p>.....</p>
+      <div>
+        $ u_t = B(\phi_0) \epsilon_t$ 
+        with
+        $B(\phi_0) = $ 
+        <span id="current-B0"></span>
+      </div>
+       <p>.....</p>
+      <div>$ e_t( B(\phi) ) = B(\phi)^{-1} u_t  =$ <span id="current-B"></span> $ u_t$</div>
+    
+    </section>
+
+    <div class="container">
+
+      <section class="chart-container" style="width: 49%; margin-right: 2%;">
+        <canvas id="scatterPlot1"></canvas>
+        <div class="stats-tables-container">
+          <div id="stats-epsilon-additional" class="stats-container"></div>
+          <div id="stats-epsilon" class="stats-container"></div> 
+        </div>
+      </section>
+ 
+ 
+
+      <section class="chart-container" style="width: 49%;  ">
+        <canvas id="scatterPlot3"></canvas>
+        <div class="stats-tables-container">
+          <div id="stats-e-additional" class="stats-container"></div>
+          <div id="stats-e" class="stats-container"></div> 
+        </div>
+      </section>
+    </div>
+
+    <section class="text-container">
+      <div>....</div>
+    </section>
+
+<div class="container">
+  <div class="button-container">
+    <button id="rollBallButton" class="orange-button">Minimize Dependencies</button>
+  </div>
+  <div class="chart-wrapper">
+    <section class="chart-container">
+      <canvas id="lossplot4"></canvas>
+    </section>
+  </div>
+</div>
+
+
+  </main>
+
+  <footer>
+    <div class="footer-container">
+        <a href="about.html">About</a>
+        <a href="https://sites.google.com/view/sascha-keweloh">Sascha Keweloh</a>
+    </div>
+</footer>
+
+
+  <script src="main.js"></script>
+ 
+</body>
+</html>
