@@ -172,12 +172,13 @@ a {
 
 /* Input Styles */
 .input-container { 
-  display: flex;
+  position: relative;
+  width: 100%;
+  z-index: 1000;
   flex-wrap: wrap;
   align-items: center; 
   background-color: #fff;
-  justify-content: center;
-  width: 100%;
+  justify-content: center; 
   box-sizing: border-box;
   border: 1px solid #ffa500;
   padding: 0px;
@@ -227,8 +228,9 @@ a {
 .input-container.sticky {
   position: fixed;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   z-index: 1000;
   width: 100%; 
   max-width: 1200px;
