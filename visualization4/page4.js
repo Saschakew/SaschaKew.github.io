@@ -74,6 +74,7 @@ function initializeUI() {
   setupStickyInputContainer();
   setupNavigationMenu();
   setupInputContentWrapper();
+  setupInfoIcons();
 
   color1 =  'rgb(75, 192, 192)';
   color2 =  'rgb(41, 128, 185)';
@@ -98,8 +99,7 @@ function initializeVariables() {
 
   generateNewData(T); 
  
-  insertEqZ(gamma1, gamma2, gamma3); 
-  insertEqSVARe(B);
+  insertEqZ2(gamma1, gamma2, 'current-z', 'z_{1t}', '\\eta_t');  
   insertEqNG(); 
   
  
@@ -205,8 +205,7 @@ function setupEventListeners() {
   createEventListener('phi', 
     (value) => document.getElementById('phiValue').textContent = value.toFixed(2),
     (value) => phi = value,
-    (value) => B = getB(phi),
-    (value) => insertEqSVARe(B),
+    (value) => B = getB(phi), 
     (value) => [e1, e2] = getE(u1,u2,B),
     (value) =>statsZE1 = calculateMoments(z1, e2), 
     (value) =>createTableZCovariance(statsZE1),
@@ -296,8 +295,8 @@ function setupEventListeners() {
   newDataBtn.addEventListener('click', function() {
     generateNewData(T);   
     insertEqNG();
-    (value) =>updateChartScatter(charts.scatterPlotZ1Eps1, z1, epsilon2, "z1 eps2", "z₁", "ε₂", true),
-    (value) =>updateChartScatter(charts.scatterPlotZ1Eps2, z2, epsilon2, "z2 eps2", "z₂", "ε₂", true),
+    updateChartScatter(charts.scatterPlotZ1Eps1, z1, epsilon2, "z1 eps2", "z₁", "ε₂", true),
+    updateChartScatter(charts.scatterPlotZ1Eps2, z2, epsilon2, "z2 eps2", "z₂", "ε₂", true),
     updateChartScatter(charts.scatterPlotZ1E1, z1, e2, "z1 e1", "z₁", "e₂", true);
     updateChartScatter(charts.scatterPlotZ1E2, z2, e2, "z2 e2", "z₂", "e₂", true);
     statsZE1 = calculateMoments(z1, e2); 
@@ -347,7 +346,7 @@ function setupEventListeners() {
     (value) =>updateChartScatter(charts.scatterPlotZ1Eps2, z2, epsilon2, "z2 eps2", "z₂", "ε₂", true),
     (value) =>updateChartScatter(charts.scatterPlotZ1E1, z1, e2, "z1 e1", "z₁", "e₂", true),
     (value) =>updateChartScatter(charts.scatterPlotZ1E2, z2, e2, "z2 e2", "z₂", "e₂", true),
-    (value) => insertEqZ(gamma1, gamma2, gamma3), 
+    (value) => insertEqZ2(gamma1, gamma2, 'current-z', 'z_{1t}','\\eta_t'), 
     (value) =>updateLossPlots(OnlyPoint=false,charts.lossplot2,phi0,phi, [
       {
         lossFunction: lossZ1,
@@ -392,7 +391,7 @@ function setupEventListeners() {
     (value) =>updateChartScatter(charts.scatterPlotZ1Eps2, z2, epsilon2, "z2 eps2", "z₂", "ε₂", true),
     (value) =>updateChartScatter(charts.scatterPlotZ1E1, z1, e2, "z1 e1", "z₁", "e₂", true),
     (value) =>updateChartScatter(charts.scatterPlotZ1E2, z2, e2, "z2 e2", "z₂", "e₂", true),
-    (value) => insertEqZ(gamma1, gamma2, gamma3), 
+    (value) => insertEqZ2(gamma1, gamma2, 'current-z', 'z_{1t}','\\eta_t'), 
     (value) =>updateLossPlots(OnlyPoint=false,charts.lossplot2,phi0,phi, [
       {
         lossFunction: lossZ1,
@@ -448,8 +447,7 @@ function setupEventListeners() {
       function(phi) { document.getElementById('phi').value = phi.toFixed(2); },
       function(phi) { document.getElementById('phiValue').textContent = phi.toFixed(2); },
       function(phi) { 
-        B = getB(phi); 
-        insertEqSVARe(B); 
+        B = getB(phi);  
       },
       function(phi) { 
         [e1, e2] = getE(u1, u2, B); 
@@ -540,15 +538,15 @@ function initializeCharts() {
   createChart('scatterPlotZ1Eps1',ScatterConfig)  
   createChart('scatterPlotZ1Eps2',ScatterConfig)  
     
-  updateChartScatter(charts.scatterPlotZ1Eps1, z1, epsilon2, "z1 eps2", "z₁", "ε₂", true);
-  updateChartScatter(charts.scatterPlotZ1Eps2, z2, epsilon2, "z2 eps2", "z₂", "ε₂", true);
+  updateChartScatter(charts.scatterPlotZ1Eps1, z1, epsilon2, "Exogeneity z₁:", "z₁", "ε₂", true);
+  updateChartScatter(charts.scatterPlotZ1Eps2, z2, epsilon2, "Exogeneity z₂:", "z₂", "ε₂", true);
 
   
   createChart('scatterPlotZ1E1',ScatterConfig)  
   createChart('scatterPlotZ1E2',ScatterConfig)  
     
-  updateChartScatter(charts.scatterPlotZ1E1, z1, e2, "z1 e1", "z₁", "e₂", true);
-  updateChartScatter(charts.scatterPlotZ1E2, z2, e2, "z2 e2", "z₂", "e₂", true);
+  updateChartScatter(charts.scatterPlotZ1E1, z1, e2, " ", "z₁", "e₂", true);
+  updateChartScatter(charts.scatterPlotZ1E2, z2, e2, " ", "z₂", "e₂", true);
 
   
 
