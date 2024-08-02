@@ -34,12 +34,17 @@ const scripts = [
  'eventListeners.js'
 ];
 
-// Load scripts sequentially
+// Load scripts sequentially 
 async function loadScripts() {
   for (const script of scripts) {
-      await loadScript(script);
+    await loadScript(script);
   }
-  initializeApp();
+  // Wait for DOM content to be loaded before initializing the app
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+  } else {
+    initializeApp();
+  }
 }
 
 // Wait for MathJax to be ready
@@ -65,9 +70,15 @@ function initializeApp() {
   setupEventListeners();
   
   // Typeset MathJax content
-  MathJax.typeset();
- 
-} ;
+  if (typeof MathJax !== 'undefined' && MathJax.typeset) {
+    MathJax.typeset();
+  }
+  
+  // Hide loading screen after a short delay to ensure everything is rendered
+  setTimeout(() => {
+    document.getElementById('loading-screen').style.display = 'none';
+  }, 500);
+}
 
 
 function initializeUI() {
