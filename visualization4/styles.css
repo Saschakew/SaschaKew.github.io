@@ -172,9 +172,7 @@ a {
 
 /* Input Styles */
 .input-container { 
-  position: relative;
-  width: 100%;
-  z-index: 1000;
+  position: flex; 
   flex-wrap: wrap;
   align-items: center; 
   background-color: #fff;
