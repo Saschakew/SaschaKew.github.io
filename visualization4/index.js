@@ -71,10 +71,9 @@ function initializeApp() {
     MathJax.typeset();
   }
   
-  // Hide loading screen after a short delay to ensure everything is rendered
-  setTimeout(() => {
+  window.addEventListener('load', () => {
     document.getElementById('loading-screen').style.display = 'none';
-  }, 500);
+  });
 }
 
 

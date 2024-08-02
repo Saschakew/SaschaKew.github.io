@@ -34,7 +34,7 @@ const scripts = [
  'eventListeners.js'
 ];
 
-// Load scripts sequentially 
+// Load scripts sequentially
 async function loadScripts() {
   for (const script of scripts) {
     await loadScript(script);
@@ -74,10 +74,9 @@ function initializeApp() {
     MathJax.typeset();
   }
   
-  // Hide loading screen after a short delay to ensure everything is rendered
-  setTimeout(() => {
+  window.addEventListener('load', () => {
     document.getElementById('loading-screen').style.display = 'none';
-  }, 500);
+  });
 }
 
 
