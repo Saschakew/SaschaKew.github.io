@@ -2,28 +2,51 @@
 
 // UI Initialization
 function setupStickyInputContainer() {
-    // Setup sticky input container
-    const inputContainer = document.querySelector('.input-container');
-  
-    if (inputContainer) {
-      const inputContainerTop = inputContainer.offsetTop;
-      const paddingTop = 0; // Account for the existing padding-top
-    
-      function handleScroll() {
-        if (window.pageYOffset > inputContainerTop - paddingTop) {
-          inputContainer.classList.add('sticky');
-          document.body.style.paddingTop = `${inputContainer.offsetHeight + paddingTop}px`;
-        } else {
-          inputContainer.classList.remove('sticky');
-          document.body.style.paddingTop = `${paddingTop}px`;
-        }
-      }
-    
-      window.addEventListener('scroll', handleScroll);
-    } else {
-      console.log('Input container not found. Sticky functionality not applied.');
+  const inputContainer = document.querySelector('.input-container');
+
+  if (inputContainer) {
+    const inputContainerTop = inputContainer.offsetTop;
+    const paddingTop = 0;
+
+    // Create debug overlay
+    const debugOverlay = document.createElement('div');
+    debugOverlay.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      z-index: 9999;
+    `;
+    document.body.appendChild(debugOverlay);
+
+    function updateDebugOverlay() {
+      debugOverlay.innerHTML = `
+        inputContainerTop: ${inputContainerTop}<br>
+        Current scroll: ${window.scrollY}<br>
+        Threshold: ${inputContainerTop - paddingTop}
+      `;
     }
-  
+
+    function handleScroll() {
+      if (window.scrollY > inputContainerTop - paddingTop) {
+        inputContainer.classList.add('sticky');
+        document.body.style.paddingTop = `${inputContainer.offsetHeight + paddingTop}px`;
+      } else {
+        inputContainer.classList.remove('sticky');
+        document.body.style.paddingTop = `${paddingTop}px`;
+      }
+      updateDebugOverlay();
+    }
+
+    window.addEventListener('scroll', handleScroll);
+    updateDebugOverlay(); // Initial update
+  } else {
+    console.log('Input container not found. Sticky functionality not applied.');
+  }
 }
 
   
