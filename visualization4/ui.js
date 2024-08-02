@@ -3,10 +3,12 @@
 // UI Initialization
 function setupStickyInputContainer() {
   const inputContainer = document.querySelector('.input-container');
+ 
 
   if (inputContainer) {
-    const inputContainerTop = inputContainer.offsetTop;
+    const inputContainerTop = inputContainer.getBoundingClientRect().top + window.scrollY;
     const paddingTop = 0;
+    let initialScrollY = window.scrollY;
 
     // Create debug overlay
     const debugOverlay = document.createElement('div');
@@ -23,16 +25,19 @@ function setupStickyInputContainer() {
     `;
     document.body.appendChild(debugOverlay);
 
+   
     function updateDebugOverlay() {
       debugOverlay.innerHTML = `
         inputContainerTop: ${inputContainerTop}<br>
+        Initial scroll: ${initialScrollY}<br>
         Current scroll: ${window.scrollY}<br>
-        Threshold: ${inputContainerTop - paddingTop}
+        Adjusted scroll: ${window.scrollY - initialScrollY}<br>
+        Threshold: ${inputContainerTop - paddingTop - initialScrollY}
       `;
     }
 
     function handleScroll() {
-      if (window.scrollY > inputContainerTop - paddingTop) {
+      if (window.scrollY - initialScrollY > inputContainerTop - paddingTop - initialScrollY) {
         inputContainer.classList.add('sticky');
         document.body.style.paddingTop = `${inputContainer.offsetHeight + paddingTop}px`;
       } else {
@@ -44,6 +49,13 @@ function setupStickyInputContainer() {
 
     window.addEventListener('scroll', handleScroll);
     updateDebugOverlay(); // Initial update
+
+    // Recalculate initial values after a short delay
+    setTimeout(() => {
+      initialScrollY = window.scrollY;
+      updateDebugOverlay();
+      handleScroll();
+    }, 100);
   } else {
     console.log('Input container not found. Sticky functionality not applied.');
   }
