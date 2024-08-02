@@ -109,14 +109,14 @@
         <p>Proxy variables are among the most popular tools to identify Structural Vector Autoregression (SVAR) models. 
             This short interactive guide illustrates how endogenous proxy variables lead to biased SVAR estimates and 
             it illustrates the test for proxy exogeneity in Bruns and Keweloh (2024).</p>  
-    </section>
+      </section>
 
       <section id="svar-model" class="text-container"> 
         <h3>The SVAR Model</h3>
         <p>In a SVAR a vector of time series $ y_t = [y_{1,t},...,y_{n,t}]'$ 
-          is explained by its own past and a vector of structural shocks $\epsilon_t =[\epsilon_{1,t},...,\epsilon_{n,t}]'$ using
+          is explained by its own past and a vector of structural shocks $\epsilon_t =[\epsilon_{1,t},...,\epsilon_{n,t}]'$ using</p>
           <div class="equation-wrapper" style="text-align: center;"> 
-          $$  y_t = A_1 y_{t-1} + ... + A_p y_{t-p} + u_t$$  $$ \quad u_t =B_0 \epsilon_t.  $$</p>
+          $$  y_t = A_1 y_{t-1} + ... + A_p y_{t-p} + u_t$$  $$ \quad u_t =B_0 \epsilon_t.  $$ 
           </div>
         <p>
           The following assumptions allow an easy visualization of the identification problem.
@@ -189,24 +189,26 @@
       
     <section id="identification-challenge" class="text-container">
       <h3>Structural shocks and Innovations</h3>
-      
+
+       
      In a given application, we neither know the rotation matrix $B(\phi_0)$ nor do we observe the structural shocks $\epsilon_t$.
       Instead, we only observe the reduced form shocks $u_t$.<span class="info-icon" data-info="In practice we only observe the macroeconomic 
       variables $y_t$ and need to estimate the VAR to get the reduced form shocks $u_t$. However, with the simplifying no-lags assumption it holds that $u_t=y_t$.">i</span> 
       Consequently, the question is how can we identify $B(\phi_0)$ and recover the structural shocks $\epsilon_t$ from the reduced form shocks $u_t$?
-      </p>   
+       
       
       <p>
       We can always choose an angle $\phi$, calculate $B(\phi)$:
+      </p>
       <div class="equation-wrapper" style="text-align: center;"> 
       $
       B(\phi) = \begin{bmatrix} \cos(\phi) & -\sin(\phi) \\ \sin(\phi) & \cos(\phi) \end{bmatrix}
       $
       </div>
-      and get the corresponding innovations  $
+      <p> and get the corresponding innovations  $
       e_t(B(\phi)) = B(\phi)^{-1} u_t 
       $ 
-      such that   
+      such that    </p>
       <div class="equation-wrapper" style="text-align: center;"> 
         $   
         \begin{bmatrix} e_{1,t} \\ e_{2,t} \end{bmatrix} 
@@ -215,9 +217,9 @@
         \begin{bmatrix} u_{1,t} \\ u_{2,t} \end{bmatrix} 
         $
       </div>
+      <p>
       These innovations represent the shocks that would yield $u_t$ if the true angle of the data-generating process $\phi_0$ were equal to the chosen angle $\phi$.
-      Specifically, for $\phi=\phi_0$ we get $e_t(B(\phi_0)) = \epsilon_t$.
-      </p>
+      Specifically, for $\phi=\phi_0$ we get $e_t(B(\phi_0)) = \epsilon_t$.</p>
 
       <ul class="input-list">
         <li>Move the $\phi$ slider to ....</li>
