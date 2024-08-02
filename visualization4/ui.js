@@ -2,56 +2,24 @@
 
 // UI Initialization
 function setupStickyInputContainer() {
+  // Setup sticky input container
   const inputContainer = document.querySelector('.input-container');
 
   if (inputContainer) {
-    const debugOverlay = document.createElement('div');
-    debugOverlay.style.cssText = `
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background-color: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 10px;
-      border-radius: 5px;
-      font-family: monospace;
-      z-index: 9999;
-    `;
-    document.body.appendChild(debugOverlay);
-
-    function updateDebugOverlay() {
-      const rect = inputContainer.getBoundingClientRect();
-      debugOverlay.innerHTML = `
-        window.scrollY: ${window.scrollY}<br>
-        inputContainer.offsetTop: ${inputContainer.offsetTop}<br>
-        inputContainer.getBoundingClientRect().top: ${rect.top}<br>
-        document.documentElement.scrollTop: ${document.documentElement.scrollTop}<br>
-        window.pageYOffset: ${window.pageYOffset}<br>
-        inputContainer.offsetHeight: ${inputContainer.offsetHeight}<br>
-        window.innerHeight: ${window.innerHeight}<br>
-        document.documentElement.clientHeight: ${document.documentElement.clientHeight}
-      `;
-    }
-
+    const inputContainerTop = inputContainer.offsetTop;
+    const paddingTop = 0; // Account for the existing padding-top
+  
     function handleScroll() {
-      const rect = inputContainer.getBoundingClientRect();
-      if (rect.top <= 0) {
+      if (window.scrollY > inputContainerTop - paddingTop) {
         inputContainer.classList.add('sticky');
-        document.body.style.paddingTop = `${inputContainer.offsetHeight}px`;
+        document.body.style.paddingTop = `${inputContainer.offsetHeight + paddingTop}px`;
       } else {
         inputContainer.classList.remove('sticky');
-        document.body.style.paddingTop = '0px';
+        document.body.style.paddingTop = `${paddingTop}px`;
       }
-      updateDebugOverlay();
     }
-
+  
     window.addEventListener('scroll', handleScroll);
-    window.addEventListener('resize', handleScroll);
-    updateDebugOverlay(); // Initial update
-
-    // Recalculate after a short delay and on load
-    setTimeout(handleScroll, 100);
-    window.addEventListener('load', handleScroll);
   } else {
     console.log('Input container not found. Sticky functionality not applied.');
   }
