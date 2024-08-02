@@ -84,8 +84,9 @@ function initializeVariables() {
   phi = getInputValue('phi');
   B0 = getB(phi0);
   B = getB(phi);
-  insertEqSVAR(B0);
-  insertEqSVARe(B);
+  
+  //insertEqSVAR(B0);
+  //insertEqSVARe(B);
 
   generateNewData(T); 
  
