@@ -228,7 +228,7 @@ function setupEventListeners() {
           lineStyle: 'solid'  
         } 
       ],
-      'none'
+      ''
     ),    
   );
 
@@ -255,7 +255,7 @@ function setupEventListeners() {
           lineStyle: 'solid'  
         } 
       ],
-      'none'
+      ''
     ), 
   );
  
@@ -333,7 +333,11 @@ function setupEventListeners() {
         }
     });
 
- 
+    
+    // Setup popups for all input labels
+    const popupIds = ['T', 'phi', 'gamma1', 'gamma2' ];
+    setupPopup(popupIds)  
+  
 }
 
 
