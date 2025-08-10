@@ -126,13 +126,27 @@ async function initializeApp() {
     document.documentElement.classList.add('ui-sticky-ready');
   } catch (e) {}
 
-  // Hide loader and re-enable scrolling
+  // Allow transitions again (preinit disabled them)
+  try { document.documentElement.classList.remove('ui-preinit'); } catch (e) {}
+
+  // Fade out loader and re-enable scrolling after fade completes
   const loader = document.getElementById('loading-screen');
-  if (loader) loader.style.display = 'none';
-  try {
-    document.documentElement.style.overflow = '';
-    document.body.style.overflow = '';
-  } catch (e) {}
+  if (loader) {
+    // Start fade-out now that layout is stable
+    loader.classList.add('fade-out');
+    loader.addEventListener('transitionend', () => {
+      loader.style.display = 'none';
+      try {
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
+      } catch (e) {}
+    }, { once: true });
+  } else {
+    try {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    } catch (e) {}
+  }
 }
 
 
