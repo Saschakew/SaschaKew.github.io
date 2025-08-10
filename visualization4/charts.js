@@ -84,8 +84,8 @@ function getLossPlotConfig() {
     },
     options: {
       responsive: true,
-      maintainAspectRatio: true,
-      aspectRatio: 1.8,
+      maintainAspectRatio: false,
+      // aspectRatio is ignored when maintainAspectRatio is false; CSS height controls the canvas size
       plugins: {
         legend: {
           display: false // Hide the legend

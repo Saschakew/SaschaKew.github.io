@@ -34,6 +34,12 @@ const scripts = [
  'eventListeners.js'
 ];
 
+// Prevent scrolling during initial render to avoid sticky recalculation jank
+try {
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
+} catch (e) {}
+
 
 // Load scripts sequentially
 async function loadScripts() {
@@ -57,7 +63,7 @@ document.addEventListener('MathJaxReady', function() {
 });
 
 
-function initializeApp() {
+async function initializeApp() {
   // Initialize UI elements
   initializeUI();
 
@@ -70,18 +76,47 @@ function initializeApp() {
   // Set up event listeners
   setupEventListeners();
 
-  // Typeset MathJax content
+  // Wait for fonts and MathJax before revealing UI to prevent layout shifts
+  try {
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+  } catch (e) {}
+
   if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
-    MathJax.typesetPromise();
+    try { await MathJax.typesetPromise(); } catch (e) {}
   }
-  
-  if (document.readyState === 'complete') {
-    document.getElementById('loading-screen').style.display = 'none';
-  } else {
-    window.addEventListener('load', () => {
-      document.getElementById('loading-screen').style.display = 'none';
-    });
-  }
+
+  // Allow a couple of frames for Chart.js responsive layout to settle
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // Lock input container height on desktop to prevent first-frame shift
+  try {
+    const ic = document.querySelector('.input-container');
+    if (ic && window.innerWidth > 768) {
+      const h = ic.offsetHeight;
+      ic.style.height = h + 'px';
+    }
+  } catch (e) {}
+
+  // Force a layout pass and broadcast resize to settle responsive components
+  try {
+    document.querySelector('.input-container')?.getBoundingClientRect();
+    window.dispatchEvent(new Event('resize'));
+  } catch (e) {}
+
+  // Enable sticky only after layout is fully stable
+  try {
+    document.documentElement.classList.add('ui-sticky-ready');
+  } catch (e) {}
+
+  // Hide loader and re-enable scrolling
+  const loader = document.getElementById('loading-screen');
+  if (loader) loader.style.display = 'none';
+  try {
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+  } catch (e) {}
 }
 
 
