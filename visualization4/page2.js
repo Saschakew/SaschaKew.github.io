@@ -12,11 +12,28 @@ let gamma1, gamma2 , gamma3;
 let color1, color2, color3;
 let W;
 
+// Cache-busting version for local assets
+const ASSET_VERSION = '20250810-235816';
+
 // Function to load a script
 function loadScript(src) {
   return new Promise((resolve, reject) => {
       let script = document.createElement('script');
-      script.src = src;
+      // Append cache-busting version to local scripts only
+      let finalSrc = src;
+      try {
+        const isExternal = /^(https?:)?\/\//i.test(src);
+        const hasQuery = src.includes('?');
+        const hasVersion = /[?&]v=/.test(src);
+        if (!isExternal) {
+          if (hasQuery) {
+            finalSrc = hasVersion ? src : `${src}&v=${ASSET_VERSION}`;
+          } else {
+            finalSrc = `${src}?v=${ASSET_VERSION}`;
+          }
+        }
+      } catch (e) { /* noop */ }
+      script.src = finalSrc;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error(`Script load error for ${src}`));
       document.head.appendChild(script);
