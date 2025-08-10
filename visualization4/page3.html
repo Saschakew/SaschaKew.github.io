@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="ui-preinit">
 <head>
  
 
@@ -66,6 +66,10 @@
       }
       </script>
 
+  <style>
+    /* Critical loader CSS to avoid flash before external styles load */
+    #loading-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center}
+  </style>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
   <script>

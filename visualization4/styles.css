@@ -19,8 +19,23 @@
   --menu-bar-height: 52px;   /* mobile menu bar height for sticky offset */
 }
 
+/* Use border-box sizing to include padding/border in element width and prevent horizontal overflow */
+html { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: inherit; }
+
 /* Reserve scrollbar space to prevent width jumps when toggling overflow */
 html { scrollbar-gutter: stable both-edges; }
+
+/* Disable transitions/animations before first reveal to prevent jank */
+html.ui-preinit *,
+html.ui-preinit *::before,
+html.ui-preinit *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* During preinit, keep overlay visible and hide the rest of the page */
+/* We rely on the fixed #loading-screen overlay, so no need to hide body */
 
 /* General Styles */
 #loading-screen {
@@ -64,6 +79,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; /* avoid tiny horizontal scrollbars on small screens */
 }
 
 main {
