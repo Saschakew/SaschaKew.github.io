@@ -84,6 +84,7 @@ function initializeApp() {
 function initializeUI() {
   setupStickyInputContainer();
   setupNavigationMenu();
+  setupActiveNavLink();
   setupInputContentWrapper();
   setupInfoIcons();
   

@@ -85,7 +85,7 @@ function getLossPlotConfig() {
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 1,
+      aspectRatio: 1.8,
       plugins: {
         legend: {
           display: false // Hide the legend

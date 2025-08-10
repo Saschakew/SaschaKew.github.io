@@ -87,12 +87,13 @@
       }
     };
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/core-js-bundle/minified.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.0.0/math.min.js"></script>
 
 </head>
 <body  class="page2">
+  <a class="skip-link" href="#main">Skip to content</a>
   <div id="loading-screen">
     <div class="loader"></div>
   </div>
@@ -100,7 +101,7 @@
     <h1>Proxy Exogeneity Test</h1>
   </header>
 
-  <main>
+  <main id="main">
     
     <section class="input-container">
 
@@ -117,7 +118,7 @@
       <nav>
         <ul>
         <li><a href="index.html" >SVAR</a></li>
-        <li><a href="page2.html" class="active">Proxies</a></li> 
+        <li><a href="page2.html">Proxies</a></li> 
         <li><a href="page3.html">Exogeneity Test   </a></li>
         <li><a href="page4.html" >Strong Exogeneity Test  </a></li> 
         </ul>
@@ -299,11 +300,11 @@
     <li>Move the $\gamma_1$ and observe how proxy strength affects the correlation of the proxy with the target shock $\epsilon_{1t}$. </li>
     <li>Move the $\gamma_2$ and observe how proxy exogeneity affects the correlation of the proxy with the non-target shock $\epsilon_{2t}$. </li>
   </ul>
-  <div class="container">   
-    <section class="chart-container" style="width: 49%; margin-right: 1%;"> 
+  <div class="container two">   
+    <section class="chart-container"> 
       <canvas id="scatterPlotZ1Eps1"  aria-label="Scatter plot of proxy and structural target shock."></canvas>
     </section> 
-    <section class="chart-container" style="width: 49%;"> 
+    <section class="chart-container"> 
       <canvas id="scatterPlotZ1Eps2" aria-label="Scatter plot of proxy and non-target shock."></canvas>
     </section> 
   </div> 
@@ -322,11 +323,11 @@
        For different values of $\phi$  the proxy and the non-target innovation $e_2$ will be correlated. </li>
   </ul>
 
-  <div class="container">   
-    <section class="chart-container" style="width: 49%; margin-right: 1%;"> 
+  <div class="container two">   
+    <section class="chart-container"> 
       <canvas id="scatterPlotZ1E1"  aria-label="Scatter plot of proxy and innovation target. "></canvas>
     </section> 
-    <section class="chart-container" style="width: 49%;"> 
+    <section class="chart-container"> 
       <canvas id="scatterPlotZ1E2" aria-label="Scatter plot of proxy and innovation non-target  "></canvas>
     </section> 
   </div>
