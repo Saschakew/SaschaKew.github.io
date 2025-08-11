@@ -59,17 +59,38 @@ html.ui-preinit *::after {
 }
 
 .loader {
-  border: 16px solid #ffa500;
-  border-top: 16px solid #fff;
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  animation: spin 2s linear infinite;
+  position: relative;
+  width: 160px;
+  height: 160px;
+  border-radius: 12px;
+  background: radial-gradient(120px 120px at 50% 50%, var(--brand-weak), transparent 70%);
+  box-shadow: var(--shadow);
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* Animated scatter dots reminiscent of the charts */
+.loader .dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: var(--brand);
+  border-radius: 50%;
+  opacity: 0.85;
+  transform: translate3d(0, 0, 0);
+  animation:
+    dot-float var(--dur, 2600ms) ease-in-out var(--delay, 0ms) infinite alternate,
+    dot-alpha 1800ms ease-in-out var(--alphaDelay, 0ms) infinite alternate;
+}
+
+/* Gentle float movement */
+@keyframes dot-float {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(var(--tx, 6px), var(--ty, -6px), 0) scale(1.05); }
+}
+
+/* Subtle alpha pulsation for depth */
+@keyframes dot-alpha {
+  from { opacity: 0.55; }
+  to   { opacity: 0.95; }
 }
 
 
@@ -215,6 +236,19 @@ a {
   max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* Center the single loss plot on Page 2 across the 12-column grid */
+body.page2 #interactive-loss .chart-loss-container {
+  /* place in the middle of the 12-col grid */
+  grid-column: 3 / -3 !important;
+  justify-self: center !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+/* Keep wrapper as contents so the loss container is the grid item */
+body.page2 #interactive-loss .chart-wrapper {
+  display: contents;
 }
 .chart-loss-container canvas {
   max-height: 520px;
@@ -627,6 +661,7 @@ header {
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.04);
+  margin-bottom: 16px;
 }
 
 header h1 {
@@ -887,6 +922,10 @@ nav a:focus-visible {
   .chart-loss-container {
     grid-column: span 6;
   }
+  /* Ensure Page 1 charts (container.three) truly span full width on small screens */
+  .container.three > .chart-container {
+    grid-column: span 6 !important;
+  }
 
   /* Ensure top button bar and loss plot wrapper span full width */
   .container > .button-container,
@@ -926,10 +965,16 @@ nav a:focus-visible {
     min-width:200px  !important;
     margin: 0 !important;
   }
+  /* Remove max-width caps so charts can fill the grid on small screens */
+  .container.two > .chart-container,
+  .container.three > .chart-container {
+    max-width: none !important;
+    width: 100% !important;
+  }
 
   .chart-loss-container {
     width:90% !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
   }
 
   /* Ensure loss plot has a concrete height on small screens */

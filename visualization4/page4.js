@@ -150,6 +150,33 @@ function initializeUI() {
   color2 = c2;
   color3 = c3;
   
+  // Override colors with the exact equation colors if present in the DOM
+  try {
+    const scope = document.querySelector('#interactive-loss') || document;
+    const eqWrappers = scope.querySelectorAll('.equation-wrapper[style*="border-color"]');
+    if (eqWrappers && eqWrappers.length >= 3) {
+      const eqColors = Array.from(eqWrappers)
+        .map(el => {
+          const cs = getComputedStyle(el);
+          return cs.borderColor || cs.color;
+        })
+        .filter(Boolean);
+      if (eqColors.length >= 3) {
+        [color1, color2, color3] = eqColors.slice(0, 3);
+      }
+    } else {
+      // Fallback to the known RGBs used in the equations
+      color1 = 'rgb(75, 192, 192)';
+      color2 = 'rgb(41, 128, 185)';
+      color3 = 'rgb(255, 177, 153)';
+    }
+  } catch (e) {
+    // Fallback in case computed styles are not available yet
+    color1 = 'rgb(75, 192, 192)';
+    color2 = 'rgb(41, 128, 185)';
+    color3 = 'rgb(255, 177, 153)';
+  }
+  
   // Setup popups for all input labels
   const popupIds = ['T', 'phi', 's1', 's2', 'gamma1', 'gamma2'];
   setupPopup(popupIds)  
