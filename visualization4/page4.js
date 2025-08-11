@@ -13,7 +13,7 @@ let color1, color2, color3;
 let W;
 
 // Cache-busting version for local assets
-const ASSET_VERSION = '20250810-235816';
+const ASSET_VERSION = '20250811-082303';
 
 // Function to load a script
 function loadScript(src) {
@@ -145,9 +145,10 @@ function initializeUI() {
   setupInputContentWrapper();
   setupInfoIcons();
 
-  color1 =  'rgb(75, 192, 192)';
-  color2 =  'rgb(41, 128, 185)';
-  color3 =  'rgb(255, 177, 153)';
+  const { color1: c1, color2: c2, color3: c3 } = getThemeAccents();
+  color1 = c1;
+  color2 = c2;
+  color3 = c3;
   
   // Setup popups for all input labels
   const popupIds = ['T', 'phi', 's1', 's2', 'gamma1', 'gamma2'];

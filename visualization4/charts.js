@@ -1,35 +1,133 @@
+// Apply global Chart.js defaults to match site theme
+(function applyChartThemeDefaults() {
+  if (typeof Chart === 'undefined') return;
+  try {
+    const styles = getComputedStyle(document.documentElement);
+    const text = (styles.getPropertyValue('--text') || '#0f172a').trim();
+    const muted = (styles.getPropertyValue('--muted') || '#6b7280').trim();
+    const border = (styles.getPropertyValue('--border') || '#e5e7eb').trim();
+
+    Chart.defaults.font = Chart.defaults.font || {};
+    Chart.defaults.font.family = "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'";
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = muted;
+
+    // Scales and grid
+    Chart.defaults.scale = Chart.defaults.scale || {};
+    Chart.defaults.scale.grid = Chart.defaults.scale.grid || {};
+    Chart.defaults.scale.grid.color = border;
+    Chart.defaults.scale.grid.drawBorder = false;
+
+    // Elements
+    Chart.defaults.elements = Chart.defaults.elements || {};
+    Chart.defaults.elements.point = Chart.defaults.elements.point || {};
+    Chart.defaults.elements.point.borderWidth = 1.5;
+
+    // Tooltip base styling
+    Chart.defaults.plugins = Chart.defaults.plugins || {};
+    Chart.defaults.plugins.tooltip = Chart.defaults.plugins.tooltip || {};
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(255,255,255,0.95)';
+    Chart.defaults.plugins.tooltip.titleColor = text;
+    Chart.defaults.plugins.tooltip.bodyColor = text;
+    Chart.defaults.plugins.tooltip.borderColor = border;
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+  } catch (e) {
+    console.warn('Chart theme defaults could not be applied:', e);
+  }
+})();
+
+// Deep clone utility that preserves function properties
+function cloneConfigPreserveFns(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(cloneConfigPreserveFns);
+  const cloned = {};
+  for (const key in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    const v = obj[key];
+    cloned[key] = (typeof v === 'function') ? v : cloneConfigPreserveFns(v);
+  }
+  return cloned;
+}
+
+// Expose theme-based accent colors derived from CSS variables
+function getThemeAccents() {
+  const styles = getComputedStyle(document.documentElement);
+  const brand = (styles.getPropertyValue('--brand') || '#ff8c00').trim();
+  const brandEnd = (styles.getPropertyValue('--brand-grad-end') || '#ffb34d').trim();
+
+  function hexToRgb(hex) {
+    const m = hex.replace('#','');
+    const bigint = parseInt(m.length === 3 ? m.split('').map(c => c + c).join('') : m, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return { r, g, b };
+  }
+
+  function rgba(hex, a) {
+    const { r, g, b } = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+
+  return {
+    color1: brand,
+    color2: brandEnd,
+    color3: rgba(brand, 0.55)
+  };
+}
+
 function getScatterPlotConfig() {
-  ChartConfig = {
+  // Pull theme colors from CSS variables for cohesive styling
+  const styles = getComputedStyle(document.documentElement);
+  const brand = (styles.getPropertyValue('--brand') || '#ff8c00').trim();
+  const brandWeak = (styles.getPropertyValue('--brand-weak') || 'rgba(255, 140, 0, 0.12)').trim();
+  const text = (styles.getPropertyValue('--text') || '#0f172a').trim();
+  const muted = (styles.getPropertyValue('--muted') || '#6b7280').trim();
+  const border = (styles.getPropertyValue('--border') || '#e5e7eb').trim();
+
+  let ChartConfig = {
     type: 'scatter',
     data: {
       datasets: [{
         label: 'Data',
         data: [],
-        backgroundColor: 'rgba(255, 165, 0, 0.6)',
-        pointRadius: 5,
-        pointHoverRadius: 7,
-        pointHoverBackgroundColor: 'rgba(255, 165, 0, 0.8)',
+        backgroundColor: brandWeak,
+        borderColor: brand,
+        pointBorderWidth: 1.5,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: brand,
       }, {
         label: 'Selected Point',
         data: [],
-        backgroundColor: 'rgb(155, 89, 182)',
-        pointRadius: 7,
-        pointHoverRadius: 9
+        backgroundColor: '#ffffff',
+        borderColor: brand,
+        pointBorderWidth: 2.5,
+        pointRadius: 6,
+        pointHoverRadius: 8
       }]
     },
     options: { 
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 1,
+      aspectRatio: 1.1,
+      layout: { padding: 4 },
+      interaction: { intersect: false, mode: 'nearest' },
+      onClick: (event, elements, chart) => handleChartClick(event, elements, chart),
       plugins: {
         title: {
           display: true,
           text: '',
-          font: { size: 18 }
+          color: text,
+          font: { size: 16, weight: '600' }
         },
         legend: { display: false },
         tooltip: {
-          enabled: false  // This disables the tooltip (hover effect)
+          enabled: true,
+          filter: (item) => item.datasetIndex === 0, // only main dataset
+          callbacks: {
+            label: (ctx) => `(${ctx.parsed.x.toFixed(2)}, ${ctx.parsed.y.toFixed(2)})`
+          }
         }
       },
       scales: {
@@ -37,15 +135,21 @@ function getScatterPlotConfig() {
           title: {
             display: true,
             text: '',
-            font: { size: 16 }
-          }
+            color: muted,
+            font: { size: 14 }
+          },
+          ticks: { color: muted },
+          grid: { color: border, drawBorder: false }
         },
         y: {
           title: {
             display: true,
             text: '',
-            font: { size: 16 }
-          }
+            color: muted,
+            font: { size: 14 }
+          },
+          ticks: { color: muted },
+          grid: { color: border, drawBorder: false }
         }
       } 
     }
@@ -56,29 +160,35 @@ function getScatterPlotConfig() {
 
 
 function getLossPlotConfig() {
-  ChartConfig = {
+  // Pull theme colors from CSS variables for cohesive styling
+  const styles = getComputedStyle(document.documentElement);
+  const text = (styles.getPropertyValue('--text') || '#0f172a').trim();
+  const muted = (styles.getPropertyValue('--muted') || '#6b7280').trim();
+  const border = (styles.getPropertyValue('--border') || '#e5e7eb').trim();
+
+  let ChartConfig = {
     type: 'line',
     data: {
       datasets: [{
         data: [],
         borderColor: 'rgb(75, 192, 192)',
-        borderWidth: 1,  // Thinner line
-        tension: 0.1,
+        borderWidth: 2,
+        tension: 0.25,
         pointRadius: 0,  // Remove dots
         pointHoverRadius: 0  // Remove hover effect
       }, {
         data: [],
         borderColor: '#ffa500',
         backgroundColor: '#ffa500',
-        pointRadius: 6,
-        pointHoverRadius: 8,
+        pointRadius: 5,
+        pointHoverRadius: 7,
         showLine: false
       }, {
         data: [],
         borderColor: 'rgb(255, 206, 86)',
         backgroundColor: 'rgb(255, 206, 86)',
-        pointRadius: 6,
-        pointHoverRadius: 8,
+        pointRadius: 5,
+        pointHoverRadius: 7,
         showLine: false
       }]
     },
@@ -93,25 +203,50 @@ function getLossPlotConfig() {
         title: {
           display: false,
           text: 'Loss Plot'
+        },
+        tooltip: {
+          enabled: true,
+          intersect: false,
+          mode: 'index',
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          titleColor: text,
+          bodyColor: text,
+          borderColor: border,
+          borderWidth: 1,
+          titleFont: { weight: '600' },
+          padding: 8
         }
+      },
+      interaction: {
+        intersect: false,
+        mode: 'nearest'
       },
       scales: {
         x: {
           title: {
             display: true,
-            text: 'ϕ'
-          }
+            text: 'ϕ',
+            color: muted
+          },
+          ticks: { color: muted },
+          grid: { color: border, drawBorder: false }
         },
         y: {
           title: {
             display: true,
-            text: 'Loss'
-          }
+            text: 'Loss',
+            color: muted
+          },
+          ticks: { color: muted },
+          grid: { color: border, drawBorder: false }
         }
       },
       elements: {
         line: {
-          borderWidth: 2  // Set all lines to be thin by default
+          borderWidth: 2.5,
+          tension: 0.25,
+          borderCapStyle: 'round',
+          borderJoinStyle: 'round'  // Smoother lines
         },
         point: {
           radius: 0  // Remove all points by default
@@ -129,7 +264,7 @@ function createChart(id,chartConfig) {
   const element = document.getElementById(id);
   if (element) {
     const ctx = element.getContext('2d');
-    charts[id] = new Chart(ctx, JSON.parse(JSON.stringify(chartConfig)));
+    charts[id] = new Chart(ctx, cloneConfigPreserveFns(chartConfig));
     console.log(`Chart ${id} created`);
   } else {
     console.log(`Element with id ${id} not found`);
@@ -138,6 +273,10 @@ function createChart(id,chartConfig) {
  
 function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
   if (!chart) return;
+  // Themed colors for axes/grid and reference lines
+  const styles = getComputedStyle(document.documentElement);
+  const muted = (styles.getPropertyValue('--muted') || '#6b7280').trim();
+  const border = (styles.getPropertyValue('--border') || '#e5e7eb').trim();
 
   if (OnlyPoint) {
     // Update only the current phi point for each loss function
@@ -161,10 +300,11 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
             type: 'scatter',
             id: `current_phi_${index}`,
             data: [{x: phi, y: currentLoss}],
-            backgroundColor: color || `color${index + 1}`,
-            borderColor: '#ffa500',
-            pointRadius: 6,
-            pointHoverRadius: 8,
+            backgroundColor: '#ffffff',
+            borderColor: color || `color${index + 1}`,
+            borderWidth: 2.5,
+            pointRadius: 5,
+            pointHoverRadius: 6,
           });
         }
       }
@@ -183,9 +323,12 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
         data: xValues.map((x, i) => ({x: x, y: yValues[i]})),
         borderColor: color || `color${index + 1}`,
         fill: false,
-        borderWidth: 2,  // Ensure thin lines
-        pointRadius: 0,  // Remove points
-        pointHoverRadius: 0  // Remove hover effect
+        borderWidth: 2.5,
+        tension: 0.25,
+        borderCapStyle: 'round',
+        borderJoinStyle: 'round',
+        pointRadius: 0,
+        pointHoverRadius: 0
       };
     
       // Add line style
@@ -205,9 +348,10 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
           type: 'scatter',
           id: `current_phi_${index}`,
           data: [{x: phi, y: currentLoss}],
-          backgroundColor: '#ffa500',
-          borderColor: '#ffa500',
-          pointRadius: 4,
+          backgroundColor: '#ffffff',
+          borderColor: color || `color${index + 1}`,
+          borderWidth: 2.5,
+          pointRadius: 5,
           pointHoverRadius: 6
         });
       }
@@ -225,8 +369,9 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
         { x: phi0, y: yMin },
         { x: phi0, y: yMax }
       ],
-      borderColor: '#ffa500',
+      borderColor: muted,
       borderWidth: 2,
+      borderDash: [6, 3],
       pointRadius: 0,
       animation: false
     });
@@ -237,7 +382,7 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
         mode: 'vertical',
         scaleID: 'x',
         value: phi0,
-        borderColor: '#ffa500',
+        borderColor: muted,
         borderWidth: 2,
         label: {
           enabled: false,
@@ -250,25 +395,31 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
       position: 'bottom',
       title: {
         display: true,
-        text: 'φ'
+        text: 'φ',
+        color: muted
       },
       min: 0,
       max: 2.35,
       ticks: {
+        color: muted,
         callback: function(value) {
           return value.toFixed(2);
         },
         maxTicksLimit: 10
-      }
+      },
+      grid: { color: border, drawBorder: false }
     };
     
     chart.options.scales.y = {
       title: {
         display: true,
-        text: 'Loss'
+        text: 'Loss',
+        color: muted
       },
       min: 0,
-      max: Math.max(0.5, ...chart.data.datasets.flatMap(dataset => dataset.data.map(point => point.y)))
+      max: Math.max(0.5, ...chart.data.datasets.flatMap(dataset => dataset.data.map(point => point.y))),
+      ticks: { color: muted },
+      grid: { color: border, drawBorder: false }
     };
   }
 
@@ -279,6 +430,10 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
 
 function updateLossPlot(OnlyPoint, chart, phi0, phi, lossFunction, animate, ...args) {
   if (!chart) return;
+  // Themed colors for axes/grid and reference lines
+  const styles = getComputedStyle(document.documentElement);
+  const muted = (styles.getPropertyValue('--muted') || '#6b7280').trim();
+  const border = (styles.getPropertyValue('--border') || '#e5e7eb').trim();
   
   if (OnlyPoint == true) {
     // Update the current phi point
@@ -311,8 +466,9 @@ function updateLossPlot(OnlyPoint, chart, phi0, phi, lossFunction, animate, ...a
         { x: phi0, y: yMin },
         { x: phi0, y: yMax }
       ],
-      borderColor: '#ffa500',
+      borderColor: muted,
       borderWidth: 2,
+      borderDash: [6, 3],
       pointRadius: 0,
       animation: false
     };
@@ -323,7 +479,7 @@ function updateLossPlot(OnlyPoint, chart, phi0, phi, lossFunction, animate, ...a
         mode: 'vertical',
         scaleID: 'x',
         value: phi0,
-        borderColor: '#ffa500',
+        borderColor: muted,
         borderWidth: 2,
         label: {
           enabled: false
@@ -336,25 +492,31 @@ function updateLossPlot(OnlyPoint, chart, phi0, phi, lossFunction, animate, ...a
       position: 'bottom',
       title: {
         display: true,
-        text: 'φ'
+        text: 'φ',
+        color: muted
       },
       min: 0,
       max: 2.35,
       ticks: {
+        color: muted,
         callback: function(value) {
           return value.toFixed(2);
         },
         maxTicksLimit: 10
-      }
+      },
+      grid: { color: border, drawBorder: false }
     };
     
     chart.options.scales.y = {
       title: {
         display: true,
-        text: 'Loss'
+        text: 'Loss',
+        color: muted
       },
       min: 0,
-      max: Math.max(0.5, ...chart.data.datasets.flatMap(dataset => dataset.data.map(point => point.y)))
+      max: Math.max(0.5, ...chart.data.datasets.flatMap(dataset => dataset.data.map(point => point.y))),
+      ticks: { color: muted },
+      grid: { color: border, drawBorder: false }
     };
   }
   
@@ -363,6 +525,10 @@ function updateLossPlot(OnlyPoint, chart, phi0, phi, lossFunction, animate, ...a
 
 function updateChartScatter(chart, xData, yData, title, xLabel, yLabel, animate = false) {
   if (!chart) return; 
+  const styles = getComputedStyle(document.documentElement);
+  const text = (styles.getPropertyValue('--text') || '#0f172a').trim();
+  const muted = (styles.getPropertyValue('--muted') || '#6b7280').trim();
+  const border = (styles.getPropertyValue('--border') || '#e5e7eb').trim();
 
   const newData = xData.map((x, i) => ({ x: x, y: yData[i] }));
 
@@ -380,11 +546,18 @@ function updateChartScatter(chart, xData, yData, title, xLabel, yLabel, animate 
   const updatedTitle = `${title} E[${xLabel} ${yLabel}] = ${meanProduct.toFixed(2)}`;
 
   chart.options.plugins.title.text = updatedTitle;
+  chart.options.plugins.title.color = text;
   chart.options.scales.x.title.text = xLabel;
+  chart.options.scales.x.title.color = muted;
   chart.options.scales.y.title.text = yLabel;
+  chart.options.scales.y.title.color = muted;
+  chart.options.scales.x.ticks = { ...(chart.options.scales.x.ticks||{}), color: muted };
+  chart.options.scales.y.ticks = { ...(chart.options.scales.y.ticks||{}), color: muted };
+  chart.options.scales.x.grid = { ...(chart.options.scales.x.grid||{}), color: border, drawBorder: false };
+  chart.options.scales.y.grid = { ...(chart.options.scales.y.grid||{}), color: border, drawBorder: false };
 
   chart.options.animation = animate ? 
-    { duration: 300, easing: 'easeInOutQuad' } : 
+    { duration: 400, easing: 'easeOutCubic' } : 
     { duration: 0 };
 
   // Maintain the selected point
@@ -424,12 +597,6 @@ function updateChartWithPhi(  ) {
     if (charts.scatterPlotZ1Eps2) highlightPoint(charts.scatterPlotZ1Eps2, index);
     if (charts.scatterPlotZ1E1) highlightPoint(charts.scatterPlotZ1E1, index); 
     if (charts.scatterPlotZ1E2) highlightPoint(charts.scatterPlotZ1E2, index);
-  }
-    // Add this function to highlight a specific point
-  function highlightPoint(chart, index) {
-    const selectedDataset = chart.data.datasets[1];
-    selectedDataset.data = [chart.data.datasets[0].data[index]];
-    chart.update();
   }
   function highlightPoint(chart, index) {
     const mainDataset = chart.data.datasets[0];
