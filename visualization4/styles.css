@@ -238,13 +238,15 @@ a {
   margin-right: auto;
 }
 
-/* Center the single loss plot on Page 2 across the 12-column grid */
-body.page2 #interactive-loss .chart-loss-container {
-  /* place in the middle of the 12-col grid */
-  grid-column: 3 / -3 !important;
-  justify-self: center !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
+/* Center the single loss plot on Page 2 across the 12-column grid (desktop only) */
+@media (min-width: 769px) {
+  body.page2 #interactive-loss .chart-loss-container {
+    /* place in the middle of the 12-col grid */
+    grid-column: 3 / -3;
+    justify-self: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 /* Keep wrapper as contents so the loss container is the grid item */
 body.page2 #interactive-loss .chart-wrapper {
