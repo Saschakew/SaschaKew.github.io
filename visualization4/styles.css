@@ -967,23 +967,27 @@ nav a:focus-visible {
   }
   /* Remove max-width caps so charts can fill the grid on small screens */
   .container.two > .chart-container,
-  .container.three > .chart-container {
-    max-width: none !important;
-    width: 100% !important;
+  .container.three  .chart-container {
+    min-width:200px  !important;
+    margin: 0 !important;
   }
 
   .chart-loss-container {
-    width:90% !important;
+    width:100% !important;
     margin: 0 auto !important;
   }
 
   /* Ensure loss plot has a concrete height on small screens */
+  #lossplot {
+    height: 320px !important; /* explicit height so Chart.js can size canvas */
+    min-height: 280px;        /* safety lower bound */
+    max-height: 420px;        /* avoid overly tall plot */
+  }
   #lossplot2 {
     height: 320px !important; /* explicit height so Chart.js can size canvas */
     min-height: 280px;        /* safety lower bound */
     max-height: 420px;        /* avoid overly tall plot */
   }
-
   
   nav {
     display: block;

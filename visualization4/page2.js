@@ -51,6 +51,12 @@ const scripts = [
  'eventListeners.js'
 ];
 
+// Prevent scrolling during initial render to avoid sticky recalculation jank
+try {
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
+} catch (e) {}
+
 // Load scripts sequentially
 async function loadScripts() {
   for (const script of scripts) {
@@ -90,13 +96,26 @@ function initializeApp() {
   if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
     MathJax.typesetPromise();
   }
-  
-  if (document.readyState === 'complete') {
-    document.getElementById('loading-screen').style.display = 'none';
+
+  // Allow transitions again (preinit disabled them)
+  try { document.documentElement.classList.remove('ui-preinit'); } catch (e) {}
+
+  // Fade out loader and re-enable scrolling after fade completes
+  const loader = document.getElementById('loading-screen');
+  if (loader) {
+    loader.classList.add('fade-out');
+    loader.addEventListener('transitionend', () => {
+      loader.style.display = 'none';
+      try {
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
+      } catch (e) {}
+    }, { once: true });
   } else {
-    window.addEventListener('load', () => {
-      document.getElementById('loading-screen').style.display = 'none';
-    });
+    try {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    } catch (e) {}
   }
 }
 
