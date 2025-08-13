@@ -2,27 +2,9 @@
 
 // UI Initialization
 function setupStickyInputContainer() {
-  // Setup sticky input container
-  const inputContainer = document.querySelector('.input-container');
-
-  if (inputContainer) {
-    const inputContainerTop = inputContainer.offsetTop;
-    const paddingTop = 0; // Account for the existing padding-top
-  
-    function handleScroll() {
-      if (window.scrollY > inputContainerTop - paddingTop) {
-        inputContainer.classList.add('sticky');
-        document.body.style.paddingTop = `${inputContainer.offsetHeight + paddingTop}px`;
-      } else {
-        inputContainer.classList.remove('sticky');
-        document.body.style.paddingTop = `${paddingTop}px`;
-      }
-    }
-  
-    window.addEventListener('scroll', handleScroll);
-  } else {
-    console.log('Input container not found. Sticky functionality not applied.');
-  }
+  // Removed JS-based sticky behavior to avoid layout shifts that caused the nav to flicker.
+  // The nav already uses CSS `position: sticky; top: 0; z-index: 900;`, which is sufficient.
+  // Intentionally no-op.
 }
 
 function positionPopup(popup, popupContent) {
@@ -164,6 +146,25 @@ function createPopup(icon, className) {
   });
 }
 
+// Highlight the current page in the navigation and set aria-current
+function setupActiveNavLink() {
+  const links = document.querySelectorAll('nav a');
+  if (!links || links.length === 0) return;
+  const urlNoHashOrQuery = window.location.href.split('#')[0].split('?')[0];
+  let path = urlNoHashOrQuery.split('/').pop();
+  if (!path || path === '') path = 'index.html';
+  links.forEach(a => {
+    const href = a.getAttribute('href');
+    if (href === path) {
+      a.classList.add('active');
+      a.setAttribute('aria-current', 'page');
+    } else {
+      a.classList.remove('active');
+      a.removeAttribute('aria-current');
+    }
+  });
+}
+
 // Add event listeners for info and ref icons
 function setupInfoIcons() {
   document.querySelectorAll('.info-icon').forEach(icon => {
@@ -173,4 +174,4 @@ function setupInfoIcons() {
     });
   });
     
-} 
+}

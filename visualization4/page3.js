@@ -12,11 +12,28 @@ let gamma1, gamma2 , gamma3;
 let color1, color2, color3;
 let W;
 
+// Cache-busting version for local assets
+const ASSET_VERSION = '20250811-082303';
+
 // Function to load a script
 function loadScript(src) {
   return new Promise((resolve, reject) => {
       let script = document.createElement('script');
-      script.src = src;
+      // Append cache-busting version to local scripts only
+      let finalSrc = src;
+      try {
+        const isExternal = /^(https?:)?\/\//i.test(src);
+        const hasQuery = src.includes('?');
+        const hasVersion = /[?&]v=/.test(src);
+        if (!isExternal) {
+          if (hasQuery) {
+            finalSrc = hasVersion ? src : `${src}&v=${ASSET_VERSION}`;
+          } else {
+            finalSrc = `${src}?v=${ASSET_VERSION}`;
+          }
+        }
+      } catch (e) { /* noop */ }
+      script.src = finalSrc;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error(`Script load error for ${src}`));
       document.head.appendChild(script);
@@ -33,6 +50,12 @@ const scripts = [
  'svar.js',
  'eventListeners.js'
 ];
+
+// Prevent scrolling during initial render to avoid sticky recalculation jank
+try {
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
+} catch (e) {}
 
 
 // Load scripts sequentially
@@ -57,7 +80,7 @@ document.addEventListener('MathJaxReady', function() {
 });
 
 
-function initializeApp() {
+async function initializeApp() {
   // Initialize UI elements
   initializeUI();
 
@@ -70,17 +93,76 @@ function initializeApp() {
   // Set up event listeners
   setupEventListeners();
 
-  // Typeset MathJax content
+  // Wait for fonts and MathJax before revealing UI to prevent layout shifts
+  try {
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+  } catch (e) {}
+
   if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
-    MathJax.typesetPromise();
+    try { await MathJax.typesetPromise(); } catch (e) {}
   }
-  
-  if (document.readyState === 'complete') {
-    document.getElementById('loading-screen').style.display = 'none';
-  } else {
-    window.addEventListener('load', () => {
-      document.getElementById('loading-screen').style.display = 'none';
+
+  // Allow a couple of frames for Chart.js responsive layout to settle
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // Lock input container height on desktop to prevent first-frame shift
+  try {
+    const ic = document.querySelector('.input-container');
+    if (ic && window.innerWidth > 768) {
+      const h = ic.offsetHeight;
+      ic.style.height = h + 'px';
+    }
+  } catch (e) {}
+
+  // Force a layout pass and broadcast resize to settle responsive components
+  try {
+    document.querySelector('.input-container')?.getBoundingClientRect();
+    window.dispatchEvent(new Event('resize'));
+  } catch (e) {}
+
+  // Recalculate on resize for desktop
+  try {
+    window.addEventListener('resize', () => {
+      const ic = document.querySelector('.input-container');
+      if (!ic) return;
+      if (window.innerWidth > 768) {
+        ic.style.height = '';
+        const h2 = ic.offsetHeight;
+        ic.style.height = h2 + 'px';
+      } else {
+        // allow natural height on mobile to support expand/collapse
+        ic.style.height = '';
+      }
     });
+  } catch (e) {}
+
+  // Enable sticky only after layout is fully stable
+  try {
+    document.documentElement.classList.add('ui-sticky-ready');
+  } catch (e) {}
+
+  // Allow transitions again (preinit disabled them)
+  try { document.documentElement.classList.remove('ui-preinit'); } catch (e) {}
+
+  // Fade out loader and re-enable scrolling after fade completes
+  const loader = document.getElementById('loading-screen');
+  if (loader) {
+    // Start fade-out now that layout is stable
+    loader.classList.add('fade-out');
+    loader.addEventListener('transitionend', () => {
+      loader.style.display = 'none';
+      try {
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
+      } catch (e) {}
+    }, { once: true });
+  } else {
+    try {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    } catch (e) {}
   }
 }
 
@@ -89,12 +171,41 @@ function initializeApp() {
 function initializeUI() {
   setupStickyInputContainer();
   setupNavigationMenu();
+  setupActiveNavLink();
   setupInputContentWrapper();
   setupInfoIcons();
 
-  color1 =  'rgb(75, 192, 192)';
-  color2 =  'rgb(41, 128, 185)';
-  color3 =  'rgb(255, 177, 153)';
+  const { color1: c1, color2: c2, color3: c3 } = getThemeAccents();
+  color1 = c1;
+  color2 = c2;
+  color3 = c3;
+
+  // Override colors with the exact equation colors if present in the DOM
+  try {
+    const scope = document.querySelector('#interactive-loss') || document;
+    const eqWrappers = scope.querySelectorAll('.equation-wrapper[style*="border-color"]');
+    if (eqWrappers && eqWrappers.length >= 3) {
+      const eqColors = Array.from(eqWrappers)
+        .map(el => {
+          const cs = getComputedStyle(el);
+          return cs.borderColor || cs.color;
+        })
+        .filter(Boolean);
+      if (eqColors.length >= 3) {
+        [color1, color2, color3] = eqColors.slice(0, 3);
+      }
+    } else {
+      // Fallback to the known RGBs used in the equations
+      color1 = 'rgb(75, 192, 192)';
+      color2 = 'rgb(41, 128, 185)';
+      color3 = 'rgb(255, 177, 153)';
+    }
+  } catch (e) {
+    // Fallback in case computed styles are not available yet
+    color1 = 'rgb(75, 192, 192)';
+    color2 = 'rgb(41, 128, 185)';
+    color3 = 'rgb(255, 177, 153)';
+  }
 
   
   // Setup popups for all input labels

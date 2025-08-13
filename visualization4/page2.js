@@ -12,11 +12,28 @@ let gamma1, gamma2 , gamma3;
 let color1, color2, color3;
 let W;
 
+// Cache-busting version for local assets
+const ASSET_VERSION = '20250811-082303';
+
 // Function to load a script
 function loadScript(src) {
   return new Promise((resolve, reject) => {
       let script = document.createElement('script');
-      script.src = src;
+      // Append cache-busting version to local scripts only
+      let finalSrc = src;
+      try {
+        const isExternal = /^(https?:)?\/\//i.test(src);
+        const hasQuery = src.includes('?');
+        const hasVersion = /[?&]v=/.test(src);
+        if (!isExternal) {
+          if (hasQuery) {
+            finalSrc = hasVersion ? src : `${src}&v=${ASSET_VERSION}`;
+          } else {
+            finalSrc = `${src}?v=${ASSET_VERSION}`;
+          }
+        }
+      } catch (e) { /* noop */ }
+      script.src = finalSrc;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error(`Script load error for ${src}`));
       document.head.appendChild(script);
@@ -33,6 +50,12 @@ const scripts = [
  'svar.js',
  'eventListeners.js'
 ];
+
+// Prevent scrolling during initial render to avoid sticky recalculation jank
+try {
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
+} catch (e) {}
 
 // Load scripts sequentially
 async function loadScripts() {
@@ -73,13 +96,26 @@ function initializeApp() {
   if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
     MathJax.typesetPromise();
   }
-  
-  if (document.readyState === 'complete') {
-    document.getElementById('loading-screen').style.display = 'none';
+
+  // Allow transitions again (preinit disabled them)
+  try { document.documentElement.classList.remove('ui-preinit'); } catch (e) {}
+
+  // Fade out loader and re-enable scrolling after fade completes
+  const loader = document.getElementById('loading-screen');
+  if (loader) {
+    loader.classList.add('fade-out');
+    loader.addEventListener('transitionend', () => {
+      loader.style.display = 'none';
+      try {
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
+      } catch (e) {}
+    }, { once: true });
   } else {
-    window.addEventListener('load', () => {
-      document.getElementById('loading-screen').style.display = 'none';
-    });
+    try {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+    } catch (e) {}
   }
 }
 
@@ -87,12 +123,14 @@ function initializeApp() {
 function initializeUI() {
   setupStickyInputContainer();
   setupNavigationMenu();
+  setupActiveNavLink();
   setupInputContentWrapper();
   setupInfoIcons();
 
-  color1 =  'rgb(75, 192, 192)';
-  color2 =  'rgb(41, 128, 185)';
-  color3 =  'rgb(255, 177, 153)';
+  const { color1: c1, color2: c2, color3: c3 } = getThemeAccents();
+  color1 = c1;
+  color2 = c2;
+  color3 = c3;
   
     // Setup popups for all input labels
     const popupIds = ['T', 'phi', 'gamma1', 'gamma2' ];
@@ -100,8 +138,6 @@ function initializeUI() {
 }
 
 
-
-        color: 'rgb(75, 192, 192)'
 function initializeVariables() { 
   s =  0;
   T= getInputValue('T');

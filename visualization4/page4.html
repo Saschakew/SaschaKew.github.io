@@ -1,18 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="ui-preinit">
 <head>
-  <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-VDNR1PZVLE"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-VDNR1PZVLE');
-</script>
-
+  
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Proxy SVAR Exogeneity Test</title>
     <meta name="description" content="Interactive guide on Proxy SVAR Exogeneity Testing, including strong exogeneity tests and visualizations of proxy relevance and exogeneity.">
   <meta name="keywords" content="SVAR, proxy variables, exogeneity test, econometrics, structural vector autoregression">
@@ -75,7 +69,12 @@
       </script>
  
 
-  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Critical loader CSS to avoid flash before external styles load */
+    #loading-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center}
+  </style>
+  <link rel="stylesheet" href="styles.css?v=20250811-082303">
+  <script src="loader.js?v=20250811-082303"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
   <script>
     MathJax = {
@@ -102,6 +101,7 @@
 
 </head>
 <body  class="page4">
+  <a class="skip-link" href="#main">Skip to content</a>
   <div id="loading-screen">
     <div class="loader"></div>
   </div>
@@ -109,7 +109,7 @@
     <h1>Proxy Exogeneity Test</h1>
   </header>
 
-  <main>
+  <main id="main">
 
     <section class="input-container">
 
@@ -128,7 +128,7 @@
         <li><a href="index.html" >SVAR</a></li>
         <li><a href="page2.html">Proxies</a></li> 
         <li><a href="page3.html">Exogeneity Test   </a></li>
-        <li><a href="page4.html" class="active">Strong Exogeneity Test</a></li> 
+        <li><a href="page4.html">Strong Exogeneity Test</a></li> 
         </ul>
       </nav>
 
@@ -401,12 +401,12 @@
           Observe how the relevance of the synthetic proxy $z_2$ changes. </li>
     </ul>
   
-      <div class="container">  
-        <section class="chart-container" style="width: 49%; margin-right: 1%;"> 
+      <div class="container two">  
+        <section class="chart-container"> 
           <canvas id="scatterPlotZ1Eps1"  aria-label="Scatter plot of the first proxy and structural target shock."></canvas>
         </section>
       
-      <section class="chart-container" style="width: 49%;"> 
+      <section class="chart-container"> 
           <canvas id="scatterPlotZ2Eps1"  aria-label="Scatter plot of the synthetic proxy and structural target shock."></canvas>
       </section> 
     </div>
@@ -422,12 +422,12 @@
           Observe how the exogeneity of the synthetic proxy $z_2$ changes. </li>
     </ul>
     
-    <div class="container">  
-        <section class="chart-container" style="width: 49%; margin-right: 1%;"> 
+    <div class="container two">  
+        <section class="chart-container"> 
           <canvas id="scatterPlotZ1Eps2"  aria-label="Scatter plot of the first proxy and structural non-target shock."></canvas>
         </section>
       
-      <section class="chart-container" style="width: 49%;"> 
+      <section class="chart-container"> 
           <canvas id="scatterPlotZ2Eps2"  aria-label="Scatter plot of the synthetic proxy and structural non-target shock."></canvas>
       </section> 
       </div>
@@ -445,13 +445,13 @@
            </li>
        </ul>
     
-    <div class="container">  
+    <div class="container two">  
     
-        <section class="chart-container" style="width: 49%; margin-right: 1%;"> 
+        <section class="chart-container"> 
           <canvas id="scatterPlotZ1E1"  aria-label="Scatter plot of the first proxy and non-target innovations."></canvas>
         </section>
       
-      <section class="chart-container" style="width: 49%;"> 
+      <section class="chart-container"> 
           <canvas id="scatterPlotZ1E2"  aria-label="Scatter plot of the synthetic proxy and non-target innovations."></canvas>
         </section> 
       </div>
@@ -590,7 +590,7 @@
     <li>Find the full paper at <a href="https://doi.org/10.1016/j.jeconom.2024.105876" target="_blank">
       Bruns and Keweloh (2024)</a>.</li> 
     <li>Access the code of this illustration at <a href="https://github.com/Saschakew/Illustrations/tree/main/visualization4" target="_blank">Github</a>.</li>
-    <li>Visit <a href="https://sites.google.com/view/sascha-keweloh/dashboards" target="_blank">dashboards</a> for more interactive illustrations.</li>
+    <li>Visit <a href="https://sascha-keweloh.com/" target="_blank">www.sascha-keweloh.com</a> for more interactive illustrations.</li>
   </ul>
  
  
@@ -605,10 +605,10 @@
   <footer>
     <div class="footer-container">
       <a href="https://github.com/Saschakew/Illustrations" target="_blank">Github</a>
-        <a href="https://sites.google.com/view/sascha-keweloh">Sascha Keweloh</a>
+        <a href="https://sascha-keweloh.com/">Sascha Keweloh</a>
     </div>
 </footer>
   
-  <script  src="page4.js"></script>
+  <script  src="page4.js?v=20250811-082303"></script>
 </body>
 </html>

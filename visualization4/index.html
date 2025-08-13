@@ -1,18 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="ui-preinit">
 <head>
-  <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-VDNR1PZVLE"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-VDNR1PZVLE');
-</script>
+ 
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Proxy SVAR Exogeneity Test</title>
   <meta name="description" content="Interactive guide on Proxy SVAR Exogeneity Testing, including strong exogeneity tests and visualizations of proxy relevance and exogeneity.">
   <meta name="keywords" content="SVAR, proxy variables, exogeneity test, econometrics, structural vector autoregression">
@@ -74,7 +69,12 @@
       }
       </script>
 
-  <link rel="stylesheet" href="styles.css">     
+  <style>
+    /* Critical loader CSS to avoid flash before external styles load */
+    #loading-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center}
+  </style>
+  <link rel="stylesheet" href="styles.css?v=20250811-082303">     
+  <script src="loader.js?v=20250811-082303"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
   <script>
     MathJax = {
@@ -99,8 +99,9 @@
   <script src="https://cdn.jsdelivr.net/npm/core-js-bundle/minified.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.0.0/math.min.js"></script>
 
-  
+  </head>
   <body  class="index">
+  <a class="skip-link" href="#main">Skip to content</a>
     <div id="loading-screen">
       <div class="loader"></div>
     </div>
@@ -111,7 +112,7 @@
     <h1>Proxy Exogeneity Test</h1>
   </header>
  
-  <main>
+  <main id="main">
 
 
     <section class="input-container">
@@ -128,7 +129,7 @@
       </div>
       <nav>
         <ul>
-        <li><a href="index.html" class="active">SVAR</a></li>
+        <li><a href="index.html">SVAR</a></li>
         <li><a href="page2.html">Proxies</a></li> 
         <li><a href="page3.html">Exogeneity Test   </a></li>
         <li><a href="page4.html" >Strong Exogeneity Test  </a></li> 
@@ -257,13 +258,15 @@
       
     <section id="assumptions" class="text-container"> 
       <h3>Simplifying assumptions</h3>
-      <p>The VAR(p) $$ y_t = A_1 y_{t-1} + ... + A_p y_{t-p} + u_t   $$  can be estimated by OLS. To simplify, consider an SVAR(0) such that the 
+      <p>The VAR(p) 
+        <div class="equation-wrapper" style="text-align: center;"> $ y_t = A_1 y_{t-1} + ... + A_p y_{t-p} + u_t   $</div>  can be estimated by OLS. To simplify, consider an SVAR(0) such that the 
         reduced form shocks $u_t$ can be thought of as observable random variables equal to an unknown linear combination $B_0$ of unknown structural form shocks $\epsilon_t$.  
       </p>
       <div class="assumption-box">
           <h5>Assumption 1: No Lags</h5>
           The SVAR has zero lags:
-          <p>   $$  y_t =   u_t \quad \text{and} \quad u_t =B_0 \epsilon_t  $$</p> 
+          <p>   
+            <div class="equation-wrapper" style="text-align: center;"> $  y_t =   u_t \quad \text{and} \quad u_t =B_0 \epsilon_t  $$</p> 
         </div> 
  
       <p>To further simplify, let's consider an SVAR with only two variables and shocks such that each of the two reduced form shocks 
@@ -272,10 +275,12 @@
           <h5>Assumption 2: Bivariate SVAR</h5>
           <p>
             The SVAR contains only two variables and shocks:
-            $$   \begin{bmatrix} u_{1,t}   \\ u_{2,t}  \end{bmatrix} 
+            
+          <div class="equation-wrapper" style="text-align: center;"> 
+          $   \begin{bmatrix} u_{1,t}   \\ u_{2,t}  \end{bmatrix} 
             =  
             \begin{bmatrix} b_{11} & b_{12} \\ b_{21} & b_{22} \end{bmatrix} 
-            \begin{bmatrix} \epsilon_{1,t}   \\ \epsilon_{2,t}  \end{bmatrix}  $$</p> 
+            \begin{bmatrix} \epsilon_{1,t}   \\ \epsilon_{2,t}  \end{bmatrix}  $</div></p> 
         </div> 
      
         <p>Finally, assume that  $B_0$ is orthogonal.<span class="info-icon" data-info="If $B_0$ where not orthogonal, 
@@ -284,10 +289,10 @@
           only depends on a single unknown parameter, which simplifies the visualizations.</p>
         <div class="assumption-box">
           <h5>Assumption 3: Orthogonal $B_0$</h5>
-          <p>The matrix $B_0$ is orthogonal and can be written as:
-          $$
-          B_0 = B(\phi_0) = \begin{bmatrix} \cos(\phi_0) & -\sin(\phi_0) \\ \sin(\phi_0) & \cos(\phi_0) \end{bmatrix}
-          $$
+          <p>The matrix $B_0$ is orthogonal and can be written as: 
+            <div class="equation-wrapper" style="text-align: center;"> 
+          $B_0 = B(\phi_0) = \begin{bmatrix} \cos(\phi_0) & -\sin(\phi_0) \\ \sin(\phi_0) & \cos(\phi_0) \end{bmatrix}
+          $</div>
           where $\phi_0$ is the unknown rotation angle.
           </p> 
           </div> 
@@ -378,18 +383,17 @@
 
       
     
-  <div class="container">
+  <div class="container three">
 
- 
-    <section class="chart-container" style="width: 30%; margin-right: 1%;"> 
+    <section class="chart-container"> 
       <canvas id="scatterPlot1"  aria-label="Scatter plot showing structural form shocks epsilon1 and epsilon2"></canvas>
     </section> 
 
-    <section class="chart-container" style="width: 30%; margin-right: 1%;"> 
+    <section class="chart-container"> 
       <canvas id="scatterPlot2"  aria-label="Scatter plot showing reduced form shocks u1 and u2"></canvas>
     </section>
 
-    <section class="chart-container" style="width: 30%;"> 
+    <section class="chart-container"> 
       <canvas id="scatterPlot3" aria-label="Scatter plot showing innovations e1 and e2"></canvas>
     </section>
 
@@ -414,10 +418,10 @@
   <footer>
     <div class="footer-container">
       <a href="https://github.com/Saschakew/Illustrations" target="_blank">Github</a>
-        <a href="https://sites.google.com/view/sascha-keweloh">Sascha Keweloh</a>
+        <a href="https://sascha-keweloh.com/">Sascha Keweloh</a>
     </div>
 </footer>
   
-  <script src="index.js"></script>
+  <script src="index.js?v=20250810-235816"></script>
 </body>
 </html>
