@@ -95,6 +95,18 @@ function getThemeAccents() {
   };
 }
 
+// Standardized labels/titles for scatter kinds
+// usage: SCATTER_LABELS.epsilon, SCATTER_LABELS.u, SCATTER_LABELS.e
+const SCATTER_LABELS = {
+  epsilon: { title: 'Structural Shocks', x: 'ε₁', y: 'ε₂' },
+  u:       { title: 'Reduced Form Shocks', x: 'u₁', y: 'u₂' },
+  e:       { title: 'Innovations', x: 'e₁', y: 'e₂' }
+};
+
+function getScatterLabels(kind) {
+  return SCATTER_LABELS[kind] || { title: '', x: '', y: '' };
+}
+
 function getScatterPlotConfig() {
   // Pull theme colors from CSS variables for cohesive styling
   const styles = getComputedStyle(document.documentElement);
@@ -119,12 +131,14 @@ function getScatterPlotConfig() {
       datasets: [{
         label: 'Data',
         data: [],
-        backgroundColor: brandWeak,
+        // Hollow points: keep border colored, fill with card/transparent
+        backgroundColor: 'transparent',
+        pointBackgroundColor: 'transparent',
         borderColor: primary,
         pointBorderWidth: 1.5,
         pointRadius: 4,
         pointHoverRadius: 6,
-        pointHoverBackgroundColor: primary,
+        pointHoverBackgroundColor: 'transparent',
       }, {
         label: 'Selected Point',
         data: [],
@@ -272,6 +286,8 @@ function getLossPlotConfig() {
             text: 'ϕ',
             color: muted
           },
+          min: 0,
+          max: 1.57,
           ticks: { color: muted },
           grid: { color: border, drawBorder: false }
         },
@@ -355,7 +371,7 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
       }
     });
   } else {
-    const xValues = Array.from({length: 236}, (_, i) => i * 0.01);
+    const xValues = Array.from({length: 158}, (_, i) => i * 0.01);
     // Clear existing datasets
     chart.data.datasets = [];
 
@@ -444,7 +460,7 @@ function updateLossPlots(OnlyPoint, chart, phi0, phi, lossFunctions, animate) {
         color: muted
       },
       min: 0,
-      max: 2.35,
+      max: 1.57,
       ticks: {
         color: muted,
         callback: function(value) {
@@ -495,7 +511,7 @@ function updateLossPlot(OnlyPoint, chart, phi0, phi, lossFunction, animate, ...a
       y: currentLoss
     }];
 
-    const xValues = Array.from({length: 236}, (_, i) => i * 0.01);
+    const xValues = Array.from({length: 158}, (_, i) => i * 0.01);
     const yValues = xValues.map(x => lossFunction(...args, x));
     
     chart.data.labels = xValues.map(x => x.toFixed(2));
@@ -541,7 +557,7 @@ function updateLossPlot(OnlyPoint, chart, phi0, phi, lossFunction, animate, ...a
         color: muted
       },
       min: 0,
-      max: 2.35,
+      max: 1.57,
       ticks: {
         color: muted,
         callback: function(value) {
@@ -568,50 +584,63 @@ function updateLossPlot(OnlyPoint, chart, phi0, phi, lossFunction, animate, ...a
   chart.update(animate);
 }
 
-function updateChartScatter(chart, xData, yData, title, xLabel, yLabel, animate = false) {
-  if (!chart) return; 
+// Unified scatter updater
+// usage 1: updateScatter(chart, x, y, 'epsilon', true)
+// usage 2: updateScatter(chart, x, y, { title, xLabel, yLabel, animate, showCov })
+function updateScatter(chart, xData, yData, kindOrOptions, animateArg) {
+  if (!chart) return;
   const styles = getComputedStyle(document.documentElement);
   const text = (styles.getPropertyValue('--text') || '#0f172a').trim();
   const muted = (styles.getPropertyValue('--muted') || '#6b7280').trim();
   const border = (styles.getPropertyValue('--border') || '#e5e7eb').trim();
-  const card = (styles.getPropertyValue('--card') || '#ffffff').trim();
+
+  let opts;
+  if (typeof kindOrOptions === 'string') {
+    const L = getScatterLabels(kindOrOptions);
+    opts = { title: L.title, xLabel: L.x, yLabel: L.y, animate: !!animateArg, showCov: true };
+  } else {
+    opts = Object.assign({ title: '', xLabel: '', yLabel: '', animate: false, showCov: true }, kindOrOptions || {});
+  }
 
   const newData = xData.map((x, i) => ({ x: x, y: yData[i] }));
-
   chart.data.datasets[0].data = newData;
-  
-  // The selected point will be updated in highlightPointOnBothCharts
-  chart.data.datasets[1].data = [];
+  // Clear selected dataset; selection is re-applied below if any
+  if (chart.data.datasets[1]) chart.data.datasets[1].data = [];
 
-  // Calculate covariance
-  const meanX = xData.reduce((sum, x) => sum + x, 0) / xData.length;
-  const meanY = yData.reduce((sum, y) => sum + y, 0) / yData.length;
-  const meanProduct = xData.reduce((sum, x, i) => sum + (x - meanX) * (yData[i] - meanY), 0) / (xData.length - 1);
+  // Covariance for title suffix
+  let updatedTitle = opts.title || '';
+  if (opts.showCov && xData.length > 1) {
+    const meanX = xData.reduce((s, v) => s + v, 0) / xData.length;
+    const meanY = yData.reduce((s, v) => s + v, 0) / yData.length;
+    const cov = xData.reduce((s, x, i) => s + (x - meanX) * (yData[i] - meanY), 0) / (xData.length - 1);
+    updatedTitle = `${updatedTitle} E[${opts.xLabel} ${opts.yLabel}] = ${cov.toFixed(2)}`.trim();
+  }
 
-  // Append covariance to the title
-  const updatedTitle = `${title} E[${xLabel} ${yLabel}] = ${meanProduct.toFixed(2)}`;
-
+  // Apply labels and theme-aware tick/grid colors
   chart.options.plugins.title.text = updatedTitle;
   chart.options.plugins.title.color = text;
-  chart.options.scales.x.title.text = xLabel;
+  chart.options.scales.x.title.text = opts.xLabel;
   chart.options.scales.x.title.color = muted;
-  chart.options.scales.y.title.text = yLabel;
+  chart.options.scales.y.title.text = opts.yLabel;
   chart.options.scales.y.title.color = muted;
-  chart.options.scales.x.ticks = { ...(chart.options.scales.x.ticks||{}), color: muted };
-  chart.options.scales.y.ticks = { ...(chart.options.scales.y.ticks||{}), color: muted };
-  chart.options.scales.x.grid = { ...(chart.options.scales.x.grid||{}), color: border, drawBorder: false };
-  chart.options.scales.y.grid = { ...(chart.options.scales.y.grid||{}), color: border, drawBorder: false };
+  chart.options.scales.x.ticks = { ...(chart.options.scales.x.ticks || {}), color: muted };
+  chart.options.scales.y.ticks = { ...(chart.options.scales.y.ticks || {}), color: muted };
+  chart.options.scales.x.grid = { ...(chart.options.scales.x.grid || {}), color: border, drawBorder: false };
+  chart.options.scales.y.grid = { ...(chart.options.scales.y.grid || {}), color: border, drawBorder: false };
 
-  chart.options.animation = animate ? 
-    { duration: 400, easing: 'easeOutCubic' } : 
-    { duration: 0 };
+  chart.options.animation = opts.animate ? { duration: 400, easing: 'easeOutCubic' } : { duration: 0 };
 
   // Maintain the selected point
-  if (selectedPointIndex !== null) {
-    highlightPointOnAllCharts(selectedPointIndex);
+  if (typeof selectedPointIndex !== 'undefined' && selectedPointIndex !== null) {
+    try { highlightPointOnAllCharts(selectedPointIndex); } catch (e) {}
   }
 
   chart.update();
+}
+
+// Backward-compatible wrapper
+function updateChartScatter(chart, xData, yData, title, xLabel, yLabel, animate = false) {
+  return updateScatter(chart, xData, yData, { title, xLabel, yLabel, animate, showCov: true });
 }
 
 function updateChartWithPhi(  ) { 
@@ -655,6 +684,30 @@ function updateChartWithPhi(  ) {
     }
     
     chart.update();
+  }
+
+  // Setter to update selection index and propagate highlight
+  function setSelectedPointIndex(index) {
+    selectedPointIndex = (typeof index === 'number') ? index : null;
+    highlightPointOnAllCharts(selectedPointIndex);
+  }
+
+  // Helper to attach click handlers to multiple scatter canvases by id
+  function attachScatterClickHandlers(ids) {
+    if (!Array.isArray(ids)) return;
+    ids.forEach((id) => {
+      const canvas = document.getElementById(id);
+      if (!canvas || !charts || !charts[id]) return;
+      canvas.addEventListener('click', function(event) {
+        const chart = charts[id];
+        try {
+          const elements = chart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, false);
+          handleChartClick(event, elements, chart);
+        } catch (e) {
+          console.warn('attachScatterClickHandlers error for', id, e);
+        }
+      });
+    });
   }
 
 
@@ -730,7 +783,7 @@ function updateChartWithPhi(  ) {
             if (leftLoss < currentLoss && leftLoss < rightLoss) {
                 newPhi = Math.max(0, currentPhi - stepSize);
             } else if (rightLoss < currentLoss && rightLoss < leftLoss) {
-                newPhi = Math.min(2.35, currentPhi + stepSize);
+                newPhi = Math.min(1.57, currentPhi + stepSize);
             } else {
                 console.log("Optima reached");
                 stuckAtBorder = true;
@@ -738,7 +791,7 @@ function updateChartWithPhi(  ) {
              
 
             // Check if the ball is stuck at the border
-            if (newPhi === 0 || newPhi === 2.35) {
+            if (newPhi === 0 || newPhi === 1.57) {
                 stuckAtBorder = true;
             }
 

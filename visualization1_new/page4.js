@@ -149,6 +149,7 @@ function setupEventListeners() {
     B = getB(phi);
     [e1, e2] = getE(u1, u2, B);
     updateAllChartsAndStats(true);
+    try { insertEqSVARe(B); } catch (e) {}
   });
 
   // New Data button
@@ -179,6 +180,7 @@ function setupEventListeners() {
           B = getB(phi);
           [e1, e2] = getE(u1, u2, B);
           updateAllChartsAndStats(true);
+          try { insertEqSVARe(B); } catch (e) {}
         }
       ];
       try {
@@ -188,6 +190,9 @@ function setupEventListeners() {
       }
     });
   }
+
+  // Standardize point-click highlighting across scatter plots
+  try { attachScatterClickHandlers(['scatterPlot2', 'scatterPlot3']); } catch (e) {}
 }
 
 
@@ -199,8 +204,8 @@ function initializeCharts() {
     const scatterCfg = getScatterPlotConfig();
     createChart('scatterPlot2', scatterCfg);
     createChart('scatterPlot3', scatterCfg);
-    updateChartScatter(charts.scatterPlot2, u1, u2, 'Reduced-form shocks', 'u\u2081', 'u\u2082', true);
-    updateChartScatter(charts.scatterPlot3, e1, e2, 'Innovations', 'e\u2081', 'e\u2082', true);
+    updateScatter(charts.scatterPlot2, u1, u2, 'u', true);
+    updateScatter(charts.scatterPlot3, e1, e2, 'e', true);
   } catch (e) {}
 
   // Loss plot
@@ -212,8 +217,8 @@ function initializeCharts() {
 function updateAllChartsAndStats(onlyPoint = false) {
   try {
     // Update scatter plots
-    updateChartScatter(charts.scatterPlot2, u1, u2, 'Reduced-form shocks', 'u\u2081', 'u\u2082');
-    updateChartScatter(charts.scatterPlot3, e1, e2, 'Innovations', 'e\u2081', 'e\u2082');
+    updateScatter(charts.scatterPlot2, u1, u2, 'u', true);
+    updateScatter(charts.scatterPlot3, e1, e2, 'e', true);
   } catch (e) {}
 
   try {
