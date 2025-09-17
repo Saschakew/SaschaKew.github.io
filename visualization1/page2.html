@@ -1,16 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="ui-preinit">
 <head>
  
+
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Understanding Non-Gaussian SVAR: An Interactive Guide</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Reduced Form</title>
+  <meta name="description" content="Explore the relationship between reduced-form shocks and structural shocks in a Non-Gaussian SVAR using interactive simulations.">
+  <meta name="keywords" content="SVAR, reduced form shocks, structural shocks, rotation, econometrics">
+
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Article",
-      "headline": "Non-Gaussian SVAR",
-      "description": "An introduction to Non-Gaussian Structural Vector Autoregression (SVAR) models, explaining the basic setup and key assumptions for simplified visualization.", 
+      "headline": "Reduced Form",
+      "description": "An interactive exploration of the relationship between reduced-form and structural shocks in a Non-Gaussian SVAR.",
       "author": {
         "@type": "Person",
         "name": "Sascha Keweloh",
@@ -31,12 +38,13 @@
       } 
     }
     </script>
+
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "LearningResource",
-        "name": "Reduced and Structural Form Shocks in Non-Gaussian SVAR",
-        "description": "This page explores the relationship between reduced form shocks and structural shocks in our Non-Gaussian SVAR model.",
+        "name": "Reduced Form in Non-Gaussian SVAR",
+        "description": "This page explores the relationship between reduced-form shocks and structural shocks in our Non-Gaussian SVAR model.",
         "learningResourceType": "Interactive Simulation",
         "educationalLevel": "Graduate",
         "isPartOf": {
@@ -44,27 +52,28 @@
           "name": "Non-Gaussian SVAR Analysis"
         },
         "teaches": [
-          {
-            "@type": "DefinedTerm",
-            "name": "Reduced Form Shocks",
-            "description": "Observable shocks in a SVAR model"
-          },
-          {
-            "@type": "DefinedTerm",
-            "name": "Structural Shocks",
-            "description": "Underlying economic shocks in a SVAR model"
-          }
+          {"@type": "DefinedTerm", "name": "Reduced Form Shocks", "description": "Observable shocks in a SVAR model"},
+          {"@type": "DefinedTerm", "name": "Structural Shocks", "description": "Underlying economic shocks in a SVAR model"}
         ],
         "interactivityType": "active"
       }
       </script>
 
-  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Critical loader CSS to avoid flash before external styles load */
+    #loading-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center}
+  </style>
+  <link rel="stylesheet" href="styles.css?v=20250811-082303">
+  <script src="loader.js?v=20250811-082303"></script>
+  <script src="bootstrap.js?v=20250811-082303"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
   <script>
     MathJax = {
       tex: {
-        inlineMath: [['$', '$'], ['\\$', '\\$']]
+        inlineMath: [['$', '$'], ['\\(', '\\)']]
+      },
+      svg: {
+        fontCache: 'global'
       },
       startup: {
         pageReady: () => {
@@ -79,114 +88,168 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/core-js-bundle/minified.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.0.0/math.min.js"></script>
+
 </head>
 <body  class="page2">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div id="loading-screen">
+    <div class="loader"></div>
+  </div>
   <header>
-    <h1>Non-Gaussian SVAR</h1>
+    <h1>Non-Gaussian SVAR: Reduced Form</h1>
   </header>
 
-  <main>
-    <div class="menu-bar">
-      <button id="menu-toggle" aria-label="Toggle menu">☰</button>
-    </div>
-    <nav>
-      <h3 id="table-of-content">Table of Contents</h3>
-      <ul>
-      <li><a href="index.html">Setup</a></li>
-      <li><a href="page2.html" class="active">Reduced Form</a></li>
-      <li><a href="page3.html">Identification Problem</a></li>
-      <li><a href="page4.html">Min. Dependencies</a></li>
-      <li><a href="page5.html">Max. non-Gaussianity</a></li>
-      <li><a href="page6.html" >Non-Gaussianity</a></li>
-      </ul>
+  <main id="main">
+    
+    <section class="input-container">
+
+      <div class="menu-bar">
+        <button id="menu-toggle" aria-label="Toggle menu">
+            <span class="icon">☰</span>
+            <span class="text">Menu</span>
+        </button>
+        <button id="input-toggle" aria-label="Toggle input">
+            <span class="icon">⚙</span>
+            <span class="text">Input</span>
+        </button>
+      </div>
+      <nav>
+        <ul>
+        <li><a href="index.html">Setup</a></li>
+        <li><a href="page2.html" aria-current="page">Reduced Form</a></li>
+        <li><a href="page3.html">Identification Problem</a></li>
+        <li><a href="page4.html">Min. Dependencies</a></li>
+        <li><a href="page5.html">Max. non-Gaussianity</a></li>
+        <li><a href="page6.html">Non-Gaussianity</a></li>
+        </ul>
       </nav>
 
-
-      <section class="input-container">
-        <div>
-          <label for="T">T =</label>
-          <input type="number" id="T" class="T-input" value="250" min="10" max="999">
-        </div>
-        <div>
-          <label for="phi0">$\phi_0$ = </label>
-          <input type="range" id="phi0" value="0.5" min="0" max="1.57" step="0.1">
-          <div id="phi0Value">0.50</div>
-        </div>
-        <div> 
-          <input type="hidden" id="phi" min="0" max="1.57" step="0.01" value="0.">
         
+      <div class="input-content-wrapper expanded">
+
+
+        <div class="input-content"  >
+
+          
+          <div class="input-wrapper">
+            <div class="label-value-wrapper">
+              <label class="InputLabel" for="T" id="T-label" title="Click for more information"><span>$T = $ </span> 
+                <span class="InputValue" id="TValue"> 250</span>
+               </label> 
+            </div>
+            <input class="InputRange" type="range" id="T" step="1" value="250" min="10" max="999">
+          </div>
+
+          <div class="input-wrapper">
+            <div class="label-value-wrapper">
+              <label class="InputLabel" for="phi0" id="phi0-label" title="Click for more information"><span>$\phi_0 = $ </span>
+                <span class="InputValue" id="phi0Value">  0.50</span>
+              </label> 
+            </div>
+            <input class="InputRange" type="range" id="phi0" min="0" max="1.57" step="0.1" value="0.5">
+          </div>
+
+          <div class="input-wrapper">
+            <button id="newDataBtn" class="orange-button">New Data</button>
+          </div>
         </div>
-        <button id="newDataBtn" class="orange-button">New Data</button>
-      </section>
-
-      <section id="introduction" class="text-container">
-        <h2>Reduced and Structural Form Shocks</h2>
-        <p>This page explores the relationship between reduced form shocks and structural shocks in our Non-Gaussian SVAR model.</p>
-    </section>
-
-
-    <section  id="shock-relationship" class="text-container">
-      <h3>The Relationship Between Reduced and Structural Form Shocks</h3>
-            
-      <p>In our simplified SVAR model, the reduced form shocks $u_t$ and consequently the macroeconomic variables $y_t$ can 
-        be thought of a rotation with angle $\phi_0$<span class="info-icon" data-info="To be precise, we can transform $\phi_0$ using $\phi_0 * (180 / π)$ to get the angle in degree. ">i</span> of the structural form shocks $\epsilon_t$:
-        <div class="equation-wrapper" style="text-align: center;"> 
-        $   \begin{bmatrix} u_{1,t}   \\ u_{2,t}  \end{bmatrix} 
-        =  
-        \begin{bmatrix} \cos(\phi_0) & -\sin(\phi_0) \\ \sin(\phi_0) & \cos(\phi_0) \end{bmatrix}
-        \begin{bmatrix} \epsilon_{1,t}   \\ \epsilon_{2,t}  \end{bmatrix} 
-        $
-        <span id="current-B0"></span>
-        </div>
-        </p>
-    </section>
-
-    
-    <section  id="interactive-simulation" class="text-container">
-      <h3>Interactive Simulation</h3>
-      <p>
-        In the simulation below, the structural form shocks are independently drawn from a uniform distribution.<span class="info-icon" data-info="The shocks are normalized to mean zero, unit variance, and zero correlation.">i</span>
-        <br>
-        Move the $\phi_0$ slider above to see how $B(\phi_0)$ leads to different rotations $u_t$ of $\epsilon_t$.
-        <br>
-        Push the New-Data-Button to draw a new set of structural shocks $\epsilon_t$.
-        </p>
-      
-      <div id="current-B" style="display: none;"></div>   
-      
-      <div class="container"> 
-        <section class="chart-container" style="width: 49%; margin-right: 2%;">
-          <canvas id="scatterPlot1" aria-label="Scatter plot showing structural shocks epsilon1 and epsilon2"></canvas>
-        </section>
-  
-        <section class="chart-container" style="width: 49%;">
-          <canvas id="scatterPlot2" aria-label="Scatter plot showing reduced form shocks u1 and u2"></canvas>
-        </section> 
       </div>
+      
     </section>
 
+    <div class="popup-container">
+    <div id="T-popup" class="popup">
+      <div class="popup-content">
+        <span class="close">&times;</span>
+        <h3>Sample Size: $T$</h3>
+        <p>T represents the sample size or the number of observations in the dataset.</p>
+      </div>
+    </div>
+    <div id="phi0-popup" class="popup">
+      <div class="popup-content">
+        <span class="close">&times;</span>
+        <h3>Rotation angle: $\phi_0$</h3>
+        <p>In the bivariate SVAR $u_t = B_0(\phi_0) \epsilon_t$, the reduced-form shocks $u_t$ are a rotation of the structural shocks $\epsilon_t$ by angle $\phi_0$ (in radians).</p>
+      </div>
+    </div>
+  </div>
 
  
 
-  <section id="implications" class="text-container">
-      <h3>Implications for Identification</h3>
-      <p>Understanding this relationship is crucial for our identification strategy:</p>
-      <ol>
-        <li>We observe $u_t$ but not $\epsilon_t$ or $\phi_0$.</li>
-        <li>Our goal is to estimate $\phi_0$ and recover $\epsilon_t$ from $u_t$.</li>
-        <li>The non-Gaussian properties of $\epsilon_t$ will be key to our identification strategy.</li>
-        </ol>
-  </section>
-  
-  <div  id="next-steps" class="text-container">
+
+
+      <section id="introduction" class="text-container">
+        <h2>Reduced Form</h2>
+        <p>This page explores the relationship between reduced-form shocks and structural shocks in our Non-Gaussian SVAR model.</p>
+      </section>
+
+      <section id="relationship" class="text-container">
+        <h3>The Relationship Between Reduced and Structural Form Shocks</h3>
+        <p>
+          In our simplified SVAR model, the reduced-form shocks $u_t$ can be viewed as a rotation of the structural shocks $\epsilon_t$ by angle $\phi_0$:
+        </p>
+        <div class="equation-wrapper" style="text-align: center;">
+          $
+          \begin{bmatrix} u_{1,t} \\ u_{2,t} \end{bmatrix}
+          =
+          B_0(\phi_0)
+          \begin{bmatrix} \epsilon_{1,t} \\ \epsilon_{2,t} \end{bmatrix}
+          $
+        </div>
+        <div class="equation-wrapper" style="text-align: center;">
+          <span id="current-B0"></span>
+        </div>
+      </section>
+
+   
+<section id="interactive-simulation" class="text-container">
+  <h3>Interactive Simulation</h3>
+  <p>
+    In the simulation below, the structural shocks are independently drawn from a uniform distribution.
+    Move the $\phi_0$ slider above to see how $B(\phi_0)$ leads to different rotations $u_t$ of $\epsilon_t$.
+    Click the New Data button to draw a new set of structural shocks $\epsilon_t$.
+  </p>
+  <div class="container two">
+    <section class="chart-container">
+      <canvas id="scatterPlot1" aria-label="Scatter plot showing structural shocks epsilon1 and epsilon2"></canvas>
+    </section>
+    <section class="chart-container">
+      <canvas id="scatterPlot2" aria-label="Scatter plot showing reduced form shocks u1 and u2"></canvas>
+    </section>
+  </div>
+</section>
+
+ 
+
+
+
+
+
+
+<section id="implications" class="text-container">
+  <h3>Implications for Identification</h3>
+  <p>Understanding this relationship is crucial for our identification strategy:</p>
+  <ol>
+    <li>We observe $u_t$ but not $\epsilon_t$ or $\phi_0$.</li>
+    <li>Our goal is to estimate $\phi_0$ and recover $\epsilon_t$ from $u_t$.</li>
+    <li>The non-Gaussian properties of $\epsilon_t$ will be key to our identification strategy.</li>
+  </ol>
+</section>
+
+
+
+
+    
+
+
+
+
+  <div class="text-container" id="next-steps">
     <h3>Next Steps</h3>
     <p>In the next section, we'll delve deeper into the identification problem and why traditional methods fall short for non-Gaussian shocks. 
       Proceed to <a href="page3.html">The Identification Problem</a> to continue.</p>
-       
   </div>
-
-
-  </main>
 
   <footer>
     <div class="footer-container">
@@ -195,6 +258,6 @@
     </div>
 </footer>
   
-  <script  src="main.js"></script>
+  <script  src="page2.js?v=20250811-082303"></script>
 </body>
 </html>
