@@ -139,6 +139,23 @@ class PresentationApp {
             this.solutionPasswords[chNum] = pw;
             this.unlockedSolutions[chNum] = !pw; // no password => open
 
+            console.log(`[FROZEN] Chapter ${chNum} content length:`, combined.length);
+            if (combined.includes('\\begin{aligned}')) {
+                console.log('[FROZEN] Found aligned block in content');
+                // Find and log the exact display block
+                const match = combined.match(/\$\$[\s\S]*?\\begin\{aligned\}[\s\S]*?\\end\{aligned\}[\s\S]*?\$\$/);
+                if (match) {
+                    console.log('[FROZEN] Display block found:', match[0]);
+                } else {
+                    console.log('[FROZEN] No $$ wrapper found around aligned block');
+                    // Check if it's there without $$
+                    const alignedMatch = combined.match(/\\begin\{aligned\}[\s\S]*?\\end\{aligned\}/);
+                    if (alignedMatch) {
+                        console.log('[FROZEN] Raw aligned block:', alignedMatch[0]);
+                    }
+                }
+            }
+
             // Process and render content
             this.processContent(combined);
             this.buildChapterTOC();
@@ -210,6 +227,11 @@ class PresentationApp {
             console.warn('Problem Set load skipped:', e);
         }
 
+        console.log(`[DEV] Chapter ${this.chapters[chapterIndex].number} content length:`, combined.length);
+        if (combined.includes('\\begin{aligned}')) {
+            console.log('[DEV] Found aligned block in content');
+        }
+
         // Process and render content
         this.processContent(combined);
         this.buildChapterTOC();
@@ -219,18 +241,56 @@ class PresentationApp {
     }
 
     processContent(markdown) {
+        // Normalize line endings to avoid CRLF vs LF differences between dev (fetch) and frozen (fs->JSON)
+        const src = String(markdown).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         // Split content into slides. Treat '---' as hard breaks and also split on H1/H2 headers.
-        const hardSections = markdown.split(/\n---\n/g);
+        const hardSections = src.split(/\n---\n/g);
         let rawSlides = [];
         hardSections.forEach(section => {
             const parts = section.split(/(?=^#{1,2}\s)/gm);
             rawSlides.push(...parts);
         });
 
+        // Store original markdown slides
         this.slides = rawSlides
             .map(s => s.trim())
             .filter(s => s.length > 0)
             .map(slide => this.enhanceMarkdown(slide));
+
+        // Pre-render HTML with math for consistency across dev/frozen
+        this.slidesHtml = this.slides.map((md, i) => {
+            // Normalize: ensure LaTeX display environments are wrapped in $$ if missing
+            const normalized = this.normalizeDisplayEnvs(md);
+            const pre = this.protectMath(normalized);
+            const htmlRaw = marked.parse(pre.text);
+            const htmlRendered = this.renderPlaceholdersToKaTeX(htmlRaw, pre.placeholders);
+            return `<div class="slide">${htmlRendered}</div>`;
+        });
+    }
+
+    // If an aligned/align environment appears without $$ delimiters (which can happen in the
+    // frozen build payload), wrap it in $$ so KaTeX treats it as display math.
+    normalizeDisplayEnvs(md) {
+        let text = String(md || '');
+        // If an aligned/align environment exists without $$, wrap it in $$
+        if (/\\begin\{aligned\}[\s\S]*?\\end\{aligned\}/.test(text) && !/\$\$[\s\S]*?\\begin\{aligned\}/.test(text)) {
+            text = text.replace(/\\begin\{aligned\}/, '$$\n\\begin{aligned}')
+                       .replace(/\\end\{aligned\}/, '\\end{aligned}\n$$');
+        }
+        if (/\\begin\{align\}[\s\S]*?\\end\{align\}/.test(text) && !/\$\$[\s\S]*?\\begin\{align\}/.test(text)) {
+            text = text.replace(/\\begin\{align\}/, '$$\n\\begin{align}')
+                       .replace(/\\end\{align\}/, '\\end{align}\n$$');
+        }
+        // Treat bare $$...$$ as an aligned environment unless it already is one
+        text = text.replace(/\$\$([\s\S]*?)\$\$/g, (m, inner) => {
+            const trimmed = String(inner).trim();
+            if (/^\\begin\{aligned\}/.test(trimmed) || /^\\begin\{align\}/.test(trimmed)) {
+                return `$$\n${trimmed}\n$$`;
+            }
+            // Wrap inside aligned
+            return `$$\n\\begin{aligned}\n${trimmed}\n\\end{aligned}\n$$`;
+        });
+        return text;
     }
 
     enhanceMarkdown(markdown) {
@@ -248,25 +308,33 @@ class PresentationApp {
         const placeholders = [];
         let text = String(markdown);
 
-        const makeReplacer = () => (match) => {
+        const makeReplacer = (asBlock = false) => (match) => {
             const key = `@@MATH_${placeholders.length}@@`;
-            placeholders.push({ key, value: match });
-            return key;
+            placeholders.push({ key, value: match, block: !!asBlock });
+            console.log(`[PROTECT] Captured math: ${key} -> ${match.substring(0, 50)}...`);
+            return asBlock ? (`\n${key}\n`) : key;
         };
 
-        const replaceAll = (pattern) => {
-            text = text.replace(pattern, makeReplacer());
+        const replaceAll = (pattern, desc, asBlock = false) => {
+            const before = text.length;
+            text = text.replace(pattern, makeReplacer(asBlock));
+            const after = text.length;
+            console.log(`[PROTECT] ${desc}: ${before - after} chars replaced`);
         };
 
         // Order matters: replace display math first, then bracket forms,
-        // then inline paren, then inline dollar. Use non-greedy, multi-line.
-        replaceAll(/\$\$[\s\S]*?\$\$/g);        // $$ ... $$ (display)
-        replaceAll(/\\\[[\s\S]*?\\\]/g);        // \[ ... \] (display)
-        replaceAll(/\\\([\s\S]*?\\\)/g);        // \( ... \) (inline)
+        // then LaTeX environments, then inline paren, then inline dollar. Use non-greedy, multi-line.
+        replaceAll(/\$\$[\s\S]*?\$\$/g, 'Display $$', true);        // $$ ... $$ (display)
+        replaceAll(/\\\[[\s\S]*?\\\]/g, 'Display \\[\\]', true);        // \[ ... \] (display)
+        // Capture aligned/align environments even if not wrapped in $$
+        replaceAll(/\\begin\{aligned\}[\s\S]*?\\end\{aligned\}/g, 'Env aligned', true);
+        replaceAll(/\\begin\{align\}[\s\S]*?\\end\{align\}/g, 'Env align', true);
+        replaceAll(/\\\([\s\S]*?\\\)/g, 'Inline \\(\\)');        // \( ... \) (inline)
         // Inline $...$ on a single line (avoid spanning lines to reduce
         // collision with currency like $12,000). Allow escaped $ to pass.
-        replaceAll(/(?<!\\)\$[^$\n]+?(?<!\\)\$/g);
+        replaceAll(/(?<!\\)\$[^$\n]+?(?<!\\)\$/g, 'Inline $');
 
+        console.log(`[PROTECT] Total placeholders created: ${placeholders.length}`);
         return { text, placeholders };
     }
 
@@ -278,6 +346,101 @@ class PresentationApp {
             out = out.split(key).join(value);
         }
         return out;
+    }
+
+    // Primary: render placeholders to KaTeX HTML to avoid relying solely on auto-render.
+    renderPlaceholdersToKaTeX(html, placeholders) {
+        if (!html || !placeholders || placeholders.length === 0) return html;
+        let out = String(html);
+        for (const { key, value } of placeholders) {
+            let display = false;
+            let inner = String(value || '');
+            console.log(`[MATH] Processing placeholder: ${key} -> ${value.substring(0, 50)}...`);
+            try {
+                if (/^\$\$[\s\S]*\$\$$/.test(inner)) {
+                    display = true; inner = inner.slice(2, -2);
+                } else if (/^\\\[[\s\S]*\\\]$/.test(inner)) {
+                    display = true; inner = inner.slice(2, -2);
+                } else if (/^\\\([\s\S]*\\\)$/.test(inner)) {
+                    display = false; inner = inner.slice(2, -2);
+                } else if (/^(?<!\\)\$[^$\n]+?(?<!\\)\$/.test(inner)) {
+                    display = false; inner = inner.slice(1, -1);
+                }
+            } catch (_) {}
+            let replacement = inner;
+            try {
+                if (window && window.katex && typeof window.katex.renderToString === 'function') {
+                    console.log(`[MATH] Rendering with KaTeX: display=${display}, inner=${inner.substring(0, 50)}...`);
+                    // If this is a full environment (aligned/align), keep as-is; otherwise inner is already stripped
+                    const isEnv = /^\\begin\{aligned\}/.test(inner) || /^\\begin\{align\}/.test(inner);
+                    const expr = isEnv ? inner : inner;
+                    replacement = window.katex.renderToString(expr, { displayMode: display, throwOnError: false, strict: false });
+                } else {
+                    console.log('[MATH] KaTeX not available, using raw delimiters');
+                    // If KaTeX is not available yet, fall back to restoring raw delimiters
+                    replacement = value;
+                }
+            } catch (e) {
+                console.warn('[MATH] KaTeX render error:', e.message, 'for:', inner.substring(0, 50));
+                replacement = value; // graceful fallback on parse errors
+            }
+            out = out.split(key).join(replacement);
+        }
+        return out;
+    }
+
+    // Fallback: If auto-render misses some display math (rare in frozen builds due to
+    // serialization differences), scan residual text nodes for $$...$$, \[...\], or
+    // aligned/align environments and render them directly via katex.render.
+    renderResidualDisplayMath(root) {
+        if (!root || !window || !window.katex) return;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+        const nodes = [];
+        // Collect first to avoid mutating during traversal
+        while (true) {
+            const n = walker.nextNode();
+            if (!n) break;
+            const t = String(n.nodeValue || '');
+            if (t.includes('$$') || t.includes('\\[') || t.includes('\\begin{aligned}') || t.includes('\\begin{align}')) nodes.push(n);
+        }
+        nodes.forEach(node => {
+            const text = String(node.nodeValue || '');
+            const parent = node.parentNode;
+            if (!parent) return;
+            const frag = document.createDocumentFragment();
+            let idx = 0;
+            const pattern = /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\begin\{aligned\}[\s\S]*?\\end\{aligned\}|\\begin\{align\}[\s\S]*?\\end\{align\})/g;
+            let m;
+            while ((m = pattern.exec(text))) {
+                const before = text.slice(idx, m.index);
+                if (before) frag.appendChild(document.createTextNode(before));
+                const chunk = m[0];
+                let display = true;
+                let inner = chunk;
+                if (/^\$\$/.test(chunk)) {
+                    inner = chunk.slice(2, -2);
+                    display = true;
+                } else if (/^\\\[/.test(chunk)) {
+                    inner = chunk.slice(2, -2);
+                    display = true;
+                } else if (/^\\begin\{aligned\}/.test(chunk) || /^\\begin\{align\}/.test(chunk)) {
+                    // Keep full environment for KaTeX
+                    inner = chunk;
+                    display = true;
+                }
+                const span = document.createElement('span');
+                try {
+                    window.katex.render(inner, span, { displayMode: display, throwOnError: false, strict: false });
+                } catch (e) {
+                    span.textContent = chunk; // graceful fallback
+                }
+                frag.appendChild(span);
+                idx = pattern.lastIndex;
+            }
+            const after = text.slice(idx);
+            if (after) frag.appendChild(document.createTextNode(after));
+            try { parent.replaceChild(frag, node); } catch (_) {}
+        });
     }
 
     // Helpers for solution password gating
@@ -365,10 +528,16 @@ class PresentationApp {
         // Destroy any active animation instances before rerendering slide content
         this.destroyActiveAnimations();
 
-        const pre = this.protectMath(this.slides[index]);
-        const htmlRaw = marked.parse(pre.text);
-        const html = this.restoreMath(htmlRaw, pre.placeholders);
-        container.innerHTML = `<div class="slide">${html}</div>`;
+        // Use pre-rendered HTML for consistent math rendering
+        const htmlSlide = (this.slidesHtml && this.slidesHtml[index]) ? this.slidesHtml[index] : null;
+        if (htmlSlide) {
+            container.innerHTML = htmlSlide;
+        } else {
+            const pre = this.protectMath(this.slides[index]);
+            const htmlRaw = marked.parse(pre.text);
+            const htmlRendered = this.renderPlaceholdersToKaTeX(htmlRaw, pre.placeholders);
+            container.innerHTML = `<div class="slide">${htmlRendered}</div>`;
+        }
 
         // Inject optional subtitle under the first H1 if declared in markdown
         // Supported syntaxes (case-insensitive):
@@ -423,7 +592,7 @@ class PresentationApp {
             }
         } catch (_) {}
 
-        // Render math with KaTeX auto-render
+        // Render math with KaTeX auto-render (fallback; placeholders already rendered)
         if (window.renderMathInElement) {
             try {
                 window.renderMathInElement(container, {
@@ -436,6 +605,8 @@ class PresentationApp {
                     throwOnError: false,
                     strict: false
                 });
+                // Fallback pass: render any residual display math not caught above
+                this.renderResidualDisplayMath(container);
             } catch (e) {
                 console.warn('Math render error', e);
             }
@@ -659,6 +830,22 @@ class PresentationApp {
                 try { options = JSON.parse(optStr); } catch (e) { console.warn('data-anim options parse failed', e); }
             }
             try {
+                // Frozen build path: load from pre-bundled registry to avoid dynamic import/file origin issues
+                if (this.frozen && typeof window !== 'undefined' && window.__ANIMS__) {
+                    const alias = {
+                        'ch7_lagrange_tangency': 'ch7_lagrange_tangency_plot'
+                    };
+                    const key = (window.__ANIMS__[id]) ? id : (alias[id] || null);
+                    if (key && window.__ANIMS__[key] && typeof window.__ANIMS__[key].init === 'function') {
+                        const inst = window.__ANIMS__[key].init(el, options) || { destroy() {} };
+                        this.activeAnimInstances.push(inst);
+                        continue; // handled via bundled registry
+                    } else {
+                        console.info('Animation not found in frozen bundle:', id);
+                        continue;
+                    }
+                }
+
                 let loader = null;
                 switch (id) {
                     case 'ch7_lagrange_tangency':
