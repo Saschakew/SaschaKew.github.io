@@ -12,6 +12,8 @@ class PresentationApp {
         // Problem set solution protection
         this.solutionPasswords = {};   // keyed by chapter number
         this.unlockedSolutions = {};   // keyed by chapter number (boolean)
+        // Track active animation module instances to clean up on slide change
+        this.activeAnimInstances = [];
         
         this.init();
     }
@@ -360,10 +362,57 @@ class PresentationApp {
             return;
         }
 
+        // Destroy any active animation instances before rerendering slide content
+        this.destroyActiveAnimations();
+
         const pre = this.protectMath(this.slides[index]);
         const htmlRaw = marked.parse(pre.text);
         const html = this.restoreMath(htmlRaw, pre.placeholders);
         container.innerHTML = `<div class="slide">${html}</div>`;
+
+        // Inject optional subtitle under the first H1 if declared in markdown
+        // Supported syntaxes (case-insensitive):
+        // 1) HTML comment directive anywhere on the slide: <!-- subtitle: Your Name — 2025 -->
+        // 2) A line immediately after the leading H1: "Subtitle: Your Name — 2025"
+        try {
+            const slideEl = container.querySelector('.slide');
+            if (slideEl) {
+                const originalMd = this.slides[index] || '';
+                let subtitleText = null;
+                // Try HTML comment directive first
+                const m1 = originalMd.match(/<!--\s*subtitle\s*:\s*([^\n\r]+?)\s*-->/i);
+                if (m1) {
+                    subtitleText = (m1[1] || '').trim();
+                } else {
+                    // Then try a line "Subtitle: ..." immediately following a leading H1
+                    const lines = String(originalMd).split(/\r?\n/);
+                    if (lines.length > 1 && /^#\s+/.test(lines[0] || '')) {
+                        // Find the first non-empty line after the H1
+                        for (let j = 1; j < lines.length; j++) {
+                            const s = (lines[j] || '').trim();
+                            if (!s) continue;
+                            const m2 = s.match(/^Subtitle\s*:\s*(.+)$/i);
+                            if (m2) {
+                                subtitleText = (m2[1] || '').trim();
+                            }
+                            break; // Only inspect the first non-empty line after H1
+                        }
+                    }
+                }
+
+                if (subtitleText) {
+                    const h1 = slideEl.querySelector('h1');
+                    if (h1) {
+                        const p = document.createElement('p');
+                        p.className = 'subtitle';
+                        p.textContent = subtitleText;
+                        h1.insertAdjacentElement('afterend', p);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('subtitle injection failed', e);
+        }
 
         // Post-process spacing: if a list immediately follows a paragraph with
         // no blank line in the Markdown source, remove the list's top margin.
@@ -465,6 +514,16 @@ class PresentationApp {
             console.warn('details toggle enhancement failed', e);
         }
         
+        // Initialize data-anim modules inside this slide (scoped, small and explicit)
+        try {
+            const slideRoot = container.querySelector('.slide');
+            if (slideRoot) {
+                this.initDataAnimations(slideRoot);
+            }
+        } catch (e) {
+            console.warn('data-anim init failed', e);
+        }
+
         // Animations disabled: ignore any per-slide buttons (only global example remains)
         this.updateControls();
         this.updateTOCActive(index);
@@ -576,6 +635,56 @@ class PresentationApp {
     // Pruned: createRegressionAnimation removed
 
     // Pruned: createGenericAnimation removed
+
+    destroyActiveAnimations() {
+        try {
+            const arr = Array.isArray(this.activeAnimInstances) ? this.activeAnimInstances : [];
+            arr.forEach(inst => {
+                try { inst && typeof inst.destroy === 'function' && inst.destroy(); } catch (_) {}
+            });
+        } catch (_) {}
+        this.activeAnimInstances = [];
+    }
+
+    async initDataAnimations(slideRoot) {
+        if (!slideRoot) return;
+        const mounts = slideRoot.querySelectorAll('[data-anim]');
+        if (!mounts || mounts.length === 0) return;
+
+        for (const el of mounts) {
+            const id = String(el.getAttribute('data-anim') || '').trim();
+            let options = {};
+            const optStr = el.getAttribute('data-options');
+            if (optStr) {
+                try { options = JSON.parse(optStr); } catch (e) { console.warn('data-anim options parse failed', e); }
+            }
+            try {
+                let loader = null;
+                switch (id) {
+                    case 'ch7_lagrange_tangency':
+                    case 'ch7_lagrange_tangency_plot':
+                        loader = () => import('../animations/chapters/ch7_lagrange_tangency_plot.js');
+                        break;
+                    case 'ch6_unconstrained_foc_plot':
+                        loader = () => import('../animations/chapters/ch6_unconstrained_foc_plot.js');
+                        break;
+                    case 'ch7_kkt_consumer_inequality':
+                        loader = () => import('../animations/chapters/ch7_kkt_consumer_inequality.js');
+                        break;
+                    default:
+                        console.info('Unknown data-anim id:', id);
+                        continue;
+                }
+                const mod = await loader();
+                if (mod && typeof mod.init === 'function') {
+                    const inst = mod.init(el, options) || { destroy() {} };
+                    this.activeAnimInstances.push(inst);
+                }
+            } catch (e) {
+                console.error('Failed to load animation module:', id, e);
+            }
+        }
+    }
 
     showAnimation(animationId) {
         // Only the example animation is allowed

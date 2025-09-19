@@ -290,6 +290,15 @@ body {
     line-height: 1.2;
 }
 
+/* Subtitle directly under H1 (injected by app.js) */
+.slide p.subtitle {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    /* Pull closer to the H1 for a cohesive title block */
+    margin-top: -1.0rem;
+    margin-bottom: 1.75rem;
+}
+
 .slide h2 {
     font-size: 2rem;
     font-weight: 600;
@@ -698,6 +707,11 @@ body {
     
     .slide h1 {
         font-size: 2rem;
+    }
+    .slide p.subtitle {
+        font-size: 1rem;
+        margin-top: -0.6rem;
+        margin-bottom: 1.25rem;
     }
     
     .slide h2 {
