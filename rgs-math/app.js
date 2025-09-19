@@ -1,3 +1,7 @@
+// Enhanced CORS-Free Static Build - Improved Math Processing
+(function() {
+  'use strict';
+  
 // Main Application Module
 class PresentationApp {
     constructor() {
@@ -15,6 +19,19 @@ class PresentationApp {
         // Track active animation module instances to clean up on slide change
         this.activeAnimInstances = [];
         
+        // Quiet verbose logs by default; enable with ?debug=1
+        try {
+            const qs = (typeof location !== 'undefined' ? location.search : '') || '';
+            const debugOn = /(?:^|[?&])debug=1(?:&|$)/.test(qs);
+            window.__MATH_DEBUG__ = debugOn;
+            if (!debugOn && typeof console !== 'undefined') {
+                const noop = function(){};
+                // Keep warnings/errors, silence console.log/info
+                try { console.log = noop; } catch(_) {}
+                try { console.info = noop; } catch(_) {}
+            }
+        } catch(_) {}
+
         this.init();
     }
 
@@ -34,6 +51,7 @@ class PresentationApp {
     }
 
     setupLiveReload() {
+        return; // Disabled for static build
         if (this.frozen) return;
         // Connect to server-sent events for live reload
         if (typeof EventSource !== 'undefined') {
@@ -227,9 +245,14 @@ class PresentationApp {
             console.warn('Problem Set load skipped:', e);
         }
 
-        console.log(`[DEV] Chapter ${this.chapters[chapterIndex].number} content length:`, combined.length);
-        if (combined.includes('\\begin{aligned}')) {
-            console.log('[DEV] Found aligned block in content');
+        // Verbose dev logs are gated behind a debug flag
+        this.__debug = this.__debug || /[?&]debug=1/.test((typeof location !== 'undefined' ? location.search : ''));
+        if (this.__debug) {
+            try { document.body.classList.add('debug'); } catch (_) {}
+            console.log(`[DEV] Chapter ${this.chapters[chapterIndex].number} content length:`, combined.length);
+            if (combined.includes('\\begin{aligned}')) {
+                console.log('[DEV] Found aligned block in content');
+            }
         }
 
         // Process and render content
@@ -264,6 +287,8 @@ class PresentationApp {
             const pre = this.protectMath(normalized);
             const htmlRaw = marked.parse(pre.text);
             const htmlRendered = this.renderPlaceholdersToKaTeX(htmlRaw, pre.placeholders);
+            // Validate math rendering and detect issues
+            this.validateMathRendering(htmlRendered, pre.placeholders);
             return `<div class="slide">${htmlRendered}</div>`;
         });
     }
@@ -272,24 +297,22 @@ class PresentationApp {
     // frozen build payload), wrap it in $$ so KaTeX treats it as display math.
     normalizeDisplayEnvs(md) {
         let text = String(md || '');
-        // If an aligned/align environment exists without $$, wrap it in $$
+        
+        // Ensure display math blocks have proper spacing by adding empty lines
+        text = text.replace(/(\S)\n(\$\$[\s\S]*?\$\$)\n(\S)/g, '$1\n\n$2\n\n$3');
+        text = text.replace(/(\S)(\$\$[\s\S]*?\$\$)(\S)/g, '$1\n\n$2\n\n$3');
+        
+        // Handle environments without $ wrappers
         if (/\\begin\{aligned\}[\s\S]*?\\end\{aligned\}/.test(text) && !/\$\$[\s\S]*?\\begin\{aligned\}/.test(text)) {
-            text = text.replace(/\\begin\{aligned\}/, '$$\n\\begin{aligned}')
-                       .replace(/\\end\{aligned\}/, '\\end{aligned}\n$$');
+            text = text.replace(/\\begin\{aligned\}/g, '$\n\\begin{aligned}')
+                       .replace(/\\end\{aligned\}/g, '\\end{aligned}\n$');
         }
+        
         if (/\\begin\{align\}[\s\S]*?\\end\{align\}/.test(text) && !/\$\$[\s\S]*?\\begin\{align\}/.test(text)) {
-            text = text.replace(/\\begin\{align\}/, '$$\n\\begin{align}')
-                       .replace(/\\end\{align\}/, '\\end{align}\n$$');
+            text = text.replace(/\\begin\{align\}/g, '$\n\\begin{align}')
+                       .replace(/\\end\{align\}/g, '\\end{align}\n$');
         }
-        // Treat bare $$...$$ as an aligned environment unless it already is one
-        text = text.replace(/\$\$([\s\S]*?)\$\$/g, (m, inner) => {
-            const trimmed = String(inner).trim();
-            if (/^\\begin\{aligned\}/.test(trimmed) || /^\\begin\{align\}/.test(trimmed)) {
-                return `$$\n${trimmed}\n$$`;
-            }
-            // Wrap inside aligned
-            return `$$\n\\begin{aligned}\n${trimmed}\n\\end{aligned}\n$$`;
-        });
+        
         return text;
     }
 
@@ -311,7 +334,9 @@ class PresentationApp {
         const makeReplacer = (asBlock = false) => (match) => {
             const key = `@@MATH_${placeholders.length}@@`;
             placeholders.push({ key, value: match, block: !!asBlock });
-            console.log(`[PROTECT] Captured math: ${key} -> ${match.substring(0, 50)}...`);
+            if (this.__debug) {
+                console.log(`[PROTECT] Captured math: ${key} -> ${match.substring(0, 50)}...`);
+            }
             return asBlock ? (`\n${key}\n`) : key;
         };
 
@@ -319,7 +344,9 @@ class PresentationApp {
             const before = text.length;
             text = text.replace(pattern, makeReplacer(asBlock));
             const after = text.length;
-            console.log(`[PROTECT] ${desc}: ${before - after} chars replaced`);
+            if (this.__debug) {
+                console.log(`[PROTECT] ${desc}: ${before - after} chars replaced`);
+            }
         };
 
         // Order matters: replace display math first, then bracket forms,
@@ -329,12 +356,21 @@ class PresentationApp {
         // Capture aligned/align environments even if not wrapped in $$
         replaceAll(/\\begin\{aligned\}[\s\S]*?\\end\{aligned\}/g, 'Env aligned', true);
         replaceAll(/\\begin\{align\}[\s\S]*?\\end\{align\}/g, 'Env align', true);
+        // Capture matrix environments (bmatrix, pmatrix, matrix, cases)
+        replaceAll(/\\begin\{bmatrix\}[\s\S]*?\\end\{bmatrix\}/g, 'Env bmatrix', true);
+        replaceAll(/\\begin\{pmatrix\}[\s\S]*?\\end\{pmatrix\}/g, 'Env pmatrix', true);
+        replaceAll(/\\begin\{matrix\}[\s\S]*?\\end\{matrix\}/g, 'Env matrix', true);
+        replaceAll(/\\begin\{cases\}[\s\S]*?\\end\{cases\}/g, 'Env cases', true);
         replaceAll(/\\\([\s\S]*?\\\)/g, 'Inline \\(\\)');        // \( ... \) (inline)
         // Inline $...$ on a single line (avoid spanning lines to reduce
         // collision with currency like $12,000). Allow escaped $ to pass.
-        replaceAll(/(?<!\\)\$[^$\n]+?(?<!\\)\$/g, 'Inline $');
+        replaceAll(/(?<!\\)\$[^$\n]+?(?<!\\)\$/g, 'Inline $ (single line)');
+        // Multiline inline $...$ (for cases where math spans lines)
+        replaceAll(/(?<!\\)\$[\s\S]*?(?<!\\)\$/g, 'Inline $ (multiline)');
 
-        console.log(`[PROTECT] Total placeholders created: ${placeholders.length}`);
+        if (this.__debug) {
+            console.log(`[PROTECT] Total placeholders created: ${placeholders.length}`);
+        }
         return { text, placeholders };
     }
 
@@ -348,14 +384,138 @@ class PresentationApp {
         return out;
     }
 
-    // Primary: render placeholders to KaTeX HTML to avoid relying solely on auto-render.
+    // Provide a global helper to dump a compact Markdown report you can paste into Slides/errors.md
+    // Usage in dev tools: window.dumpErrorReport()
+    dumpErrorReport() {
+        const buckets = window.__errorBuckets || {};
+        const keys = Object.keys(buckets);
+        if (!keys.length) {
+            console.log('# Math Error Report\n\nNo errors collected.');
+            return;
+        }
+        const lines = ['# Math Error Report', '', 'Aggregated KaTeX/render issues (deduplicated):', ''];
+        keys.forEach(k => {
+            const e = buckets[k];
+            const when = new Date(e.lastAt).toISOString();
+            const sample = e.sample && e.sample.expr ? e.sample.expr : '';
+            lines.push(`- **${k}** — count=${e.count} — last=${when}`);
+            if (sample) lines.push(`  - sample: \`${sample.replace(/`/g, '\\`')}\``);
+        });
+        console.log(lines.join('\n'));
+    }
+
+    // Normalize problematic Unicode characters to TeX equivalents before KaTeX rendering
+    normalizeMathUnicode(mathText) {
+        if (!mathText) return mathText;
+        return String(mathText)
+            // Double vertical bar (norm notation) - main culprit from errors.md
+            .replace(/‖/g, '\\Vert')
+            // Fractions and special characters
+            .replace(/½/g, '\\frac{1}{2}')
+            .replace(/⅓/g, '\\frac{1}{3}')
+            .replace(/¼/g, '\\frac{1}{4}')
+            .replace(/¾/g, '\\frac{3}{4}')
+            .replace(/⅛/g, '\\frac{1}{8}')
+            // Inequality symbols
+            .replace(/≤/g, '\\le')
+            .replace(/≥/g, '\\ge')
+            .replace(/≠/g, '\\neq')
+            .replace(/≈/g, '\\approx')
+            // Multiplication and operations
+            .replace(/×/g, '\\times')
+            .replace(/·/g, '\\cdot')
+            .replace(/÷/g, '\\div')
+            // Greek letters that might be Unicode
+            .replace(/α/g, '\\alpha')
+            .replace(/β/g, '\\beta')
+            .replace(/γ/g, '\\gamma')
+            .replace(/δ/g, '\\delta')
+            .replace(/ε/g, '\\epsilon')
+            .replace(/λ/g, '\\lambda')
+            .replace(/μ/g, '\\mu')
+            .replace(/π/g, '\\pi')
+            .replace(/σ/g, '\\sigma')
+            .replace(/θ/g, '\\theta')
+            .replace(/Δ/g, '\\Delta')
+            .replace(/Σ/g, '\\Sigma')
+            .replace(/Π/g, '\\Pi')
+            // Blackboard bold common sets
+            .replace(/ℝ/g, '\\mathbb{R}')
+            .replace(/ℤ/g, '\\mathbb{Z}')
+            .replace(/ℚ/g, '\\mathbb{Q}')
+            .replace(/ℕ/g, '\\mathbb{N}')
+            .replace(/ℂ/g, '\\mathbb{C}')
+            // Arrows and other symbols
+            .replace(/→/g, '\\rightarrow')
+            .replace(/←/g, '\\leftarrow')
+            .replace(/↔/g, '\\leftrightarrow')
+            .replace(/⇒/g, '\\Rightarrow')
+            .replace(/⇐/g, '\\Leftarrow')
+            .replace(/⇔/g, '\\Leftrightarrow')
+            .replace(/∈/g, '\\in')
+            .replace(/∉/g, '\\notin')
+            .replace(/⊆/g, '\\subseteq')
+            .replace(/⊇/g, '\\supseteq')
+            .replace(/∪/g, '\\cup')
+            .replace(/∩/g, '\\cap')
+            .replace(/∅/g, '\\emptyset')
+            .replace(/∞/g, '\\infty')
+            // Partial and Nabla, including italic/bold math unicode variants
+            .replace(/[∂𝜕𝝏]/g, '\\partial')
+            .replace(/[∇𝛻𝜵]/g, '\\nabla')
+            .replace(/∫/g, '\\int')
+            .replace(/∑/g, '\\sum')
+            .replace(/∏/g, '\\prod')
+            // Unicode minus (U+2212) to ASCII hyphen
+            .replace(/−/g, '-')
+            // Non-breaking space to regular space
+            .replace(/\u00A0/g, ' ')
+            // Smart quotes to ASCII (can interfere with parsing)
+            .replace(/[""]/g, '"')
+            .replace(/['']/g, "'");
+    }
+
+    // Render protected math placeholders to KaTeX HTML with error bucketing
     renderPlaceholdersToKaTeX(html, placeholders) {
         if (!html || !placeholders || placeholders.length === 0) return html;
         let out = String(html);
+
+        // Initialize error bucket storage
+        const buckets = (window.__errorBuckets = window.__errorBuckets || {});
+        const now = Date.now();
+        const bucketError = (source, message, sample) => {
+            const key = `${source}: ${message}`;
+            const entry = buckets[key] || { count: 0, firstAt: now, lastAt: now, sample: null, source };
+            entry.count += 1;
+            entry.lastAt = now;
+            if (!entry.sample && sample) entry.sample = sample;
+            buckets[key] = entry;
+        };
+
+        // Build a quick lookup for placeholder raw values
+        const phMap = Object.create(null);
+        placeholders.forEach(p => { phMap[p.key] = p.value; });
+
+        // Expand nested placeholders inside a raw TeX string back to raw TeX
+        const expandRaw = (tex, depth = 0) => {
+            if (!tex) return tex;
+            // Safety to avoid pathological recursion
+            if (depth > 5) return tex;
+            let changed = false;
+            let expanded = String(tex).replace(/@@MATH_\d+@@/g, (m) => {
+                if (phMap[m]) { changed = true; return phMap[m]; }
+                return m;
+            });
+            return changed ? expandRaw(expanded, depth + 1) : expanded;
+        };
+
         for (const { key, value } of placeholders) {
             let display = false;
-            let inner = String(value || '');
-            console.log(`[MATH] Processing placeholder: ${key} -> ${value.substring(0, 50)}...`);
+            // Expand any nested placeholders in the raw value back to LaTeX before normalization/KaTeX
+            let inner = expandRaw(String(value || ''));
+            if (this.__debug) {
+                console.log(`[MATH] Processing placeholder: ${key} -> ${value.substring(0, 50)}...`);
+            }
             try {
                 if (/^\$\$[\s\S]*\$\$$/.test(inner)) {
                     display = true; inner = inner.slice(2, -2);
@@ -367,30 +527,196 @@ class PresentationApp {
                     display = false; inner = inner.slice(1, -1);
                 }
             } catch (_) {}
+
+            // Normalize Unicode to TeX
+            inner = this.normalizeMathUnicode(inner);
+
             let replacement = inner;
             try {
                 if (window && window.katex && typeof window.katex.renderToString === 'function') {
-                    console.log(`[MATH] Rendering with KaTeX: display=${display}, inner=${inner.substring(0, 50)}...`);
-                    // If this is a full environment (aligned/align), keep as-is; otherwise inner is already stripped
+                    if (this.__debug) {
+                        console.log(`[MATH] Rendering with KaTeX: display=${display}, inner=${inner.substring(0, 50)}...`);
+                    }
                     const isEnv = /^\\begin\{aligned\}/.test(inner) || /^\\begin\{align\}/.test(inner);
                     const expr = isEnv ? inner : inner;
                     replacement = window.katex.renderToString(expr, { displayMode: display, throwOnError: false, strict: false });
                 } else {
-                    console.log('[MATH] KaTeX not available, using raw delimiters');
-                    // If KaTeX is not available yet, fall back to restoring raw delimiters
+                    if (this.__debug) console.log('[MATH] KaTeX not available, using raw delimiters');
                     replacement = value;
                 }
             } catch (e) {
-                console.warn('[MATH] KaTeX render error:', e.message, 'for:', inner.substring(0, 50));
-                replacement = value; // graceful fallback on parse errors
+                bucketError('KaTeX', e && e.message ? e.message : 'render error', { expr: inner.substring(0, 120), display });
+                if (this.__debug) {
+                    console.warn('[MATH] KaTeX render error:', e && e.message, 'for:', inner.substring(0, 120));
+                }
+                replacement = value;
             }
             out = out.split(key).join(replacement);
         }
+
+        // Unwrap paragraphs around display blocks
+        try {
+            out = out.replace(/<p>\s*(<span class="katex-display">[\s\S]*?<\/span>)\s*<\/p>/g, '$1');
+        } catch (_) {}
+
+        // Final cleanup: if any placeholder tokens leaked, restore them to their raw TeX to avoid visible @@MATH_x@@
+        try {
+            if (/@@MATH_\d+@@/.test(out)) {
+                for (const { key, value } of placeholders) {
+                    if (out.indexOf(key) !== -1) {
+                        out = out.split(key).join(value);
+                    }
+                }
+            }
+        } catch (_) {}
+
+        // Emit one-line summary of errors (deduped) once per load unless debug
+        if (!this.__debug && !window.__errorSummaryPrinted) {
+            window.__errorSummaryPrinted = true;
+            const keys = Object.keys(window.__errorBuckets || {});
+            if (keys.length) {
+                const summary = ['[ERROR SUMMARY] KaTeX/render issues (deduped):'];
+                keys.forEach(k => {
+                    const e = window.__errorBuckets[k];
+                    summary.push(`- ${k} [count=${e.count}] example="${(e.sample && e.sample.expr) ? e.sample.expr : ''}"`);
+                });
+                console.log(summary.join('\n'));
+            }
+        }
+
         return out;
     }
 
-    // Fallback: If auto-render misses some display math (rare in frozen builds due to
-    // serialization differences), scan residual text nodes for $$...$$, \[...\], or
+    // Comprehensive math validation and error detection
+    validateMathRendering(html, originalPlaceholders) {
+        if (!html || !originalPlaceholders) return;
+        
+        const issues = [];
+        
+        // Check for unrestored placeholders
+        const unresolvedPlaceholders = html.match(/@@MATH_\d+@@/g);
+        if (unresolvedPlaceholders) {
+            issues.push({
+                type: 'UNRESOLVED_PLACEHOLDERS',
+                count: unresolvedPlaceholders.length,
+                examples: unresolvedPlaceholders.slice(0, 3),
+                severity: 'HIGH'
+            });
+        }
+        
+        // Check for raw LaTeX that should have been processed
+        const rawLatex = [
+            { pattern: /\$\$[\s\S]*?\$\$/g, type: 'DISPLAY_MATH' },
+            { pattern: /\\\[[\s\S]*?\\\]/g, type: 'DISPLAY_BRACKET' },
+            { pattern: /\\begin\{(bmatrix|pmatrix|matrix|cases|aligned|align)\}/g, type: 'ENVIRONMENT' },
+            { pattern: /(?<!\\)\$[^$\n]+?(?<!\\)\$/g, type: 'INLINE_MATH' }
+        ];
+        
+        rawLatex.forEach(({ pattern, type }) => {
+            const matches = html.match(pattern);
+            if (matches) {
+                issues.push({
+                    type: `RAW_LATEX_${type}`,
+                    count: matches.length,
+                    examples: matches.slice(0, 2).map(m => m.substring(0, 50) + '...'),
+                    severity: 'HIGH'
+                });
+            }
+        });
+        
+        // Check for incorrectly rendered display math (should be block, not inline)
+        const inlineDisplayMath = html.match(/<span class="katex"[^>]*>[\s\S]*?\\displaystyle[\s\S]*?<\/span>/g);
+        if (inlineDisplayMath) {
+            issues.push({
+                type: 'DISPLAY_AS_INLINE',
+                count: inlineDisplayMath.length,
+                examples: ['Display math rendered as inline'],
+                severity: 'MEDIUM'
+            });
+        }
+        
+        // Check for missing matrix environments
+        const matrixContent = html.match(/\\begin\{[bp]?matrix\}[\s\S]*?\\end\{[bp]?matrix\}/g);
+        if (matrixContent) {
+            issues.push({
+                type: 'UNPROCESSED_MATRIX',
+                count: matrixContent.length,
+                examples: matrixContent.slice(0, 2).map(m => m.substring(0, 40) + '...'),
+                severity: 'HIGH'
+            });
+        }
+        
+        // Report issues
+        if (issues.length > 0) {
+            const buckets = (window.__mathValidationIssues = window.__mathValidationIssues || {});
+            issues.forEach(issue => {
+                const key = issue.type;
+                const entry = buckets[key] || { count: 0, lastSeen: null, examples: [] };
+                entry.count += issue.count;
+                entry.lastSeen = new Date().toISOString();
+                entry.severity = issue.severity;
+                if (issue.examples) {
+                    entry.examples = [...new Set([...entry.examples, ...issue.examples])].slice(0, 5);
+                }
+                buckets[key] = entry;
+            });
+            
+            if (this.__debug) {
+                console.warn('[MATH VALIDATION] Issues detected:', issues);
+            }
+        }
+    }
+
+    // Enhanced error reporting that includes validation issues
+    dumpErrorReport() {
+        const katexBuckets = window.__errorBuckets || {};
+        const validationBuckets = window.__mathValidationIssues || {};
+        
+        const katexKeys = Object.keys(katexBuckets);
+        const validationKeys = Object.keys(validationBuckets);
+        
+        if (!katexKeys.length && !validationKeys.length) {
+            console.log('# Math Error Report\n\nNo errors or issues detected.');
+            return;
+        }
+        
+        const lines = ['# Math Error Report', '', 'Generated: ' + new Date().toISOString(), ''];
+        
+        if (katexKeys.length) {
+            lines.push('## KaTeX Rendering Errors', '');
+            katexKeys.forEach(k => {
+                const e = katexBuckets[k];
+                const when = new Date(e.lastAt).toISOString();
+                const sample = e.sample && e.sample.expr ? e.sample.expr : '';
+                lines.push(`- **${k}** — count=${e.count} — last=${when}`);
+                if (sample) lines.push(`  - sample: \`${sample.replace(/`/g, '\\`')}\``);
+            });
+            lines.push('');
+        }
+        
+        if (validationKeys.length) {
+            lines.push('## Math Processing Issues', '');
+            validationKeys.forEach(k => {
+                const issue = validationBuckets[k];
+                lines.push(`- **${k}** (${issue.severity}) — count=${issue.count} — last=${issue.lastSeen}`);
+                if (issue.examples && issue.examples.length) {
+                    issue.examples.forEach(ex => {
+                        lines.push(`  - example: \`${ex.replace(/`/g, '\\`')}\``);
+                    });
+                }
+            });
+            lines.push('');
+        }
+        
+        lines.push('## Debugging Tips', '');
+        lines.push('- Add `?debug=1` to URL for verbose logging');
+        lines.push('- Check for unmatched delimiters in markdown');
+        lines.push('- Verify LaTeX environment syntax');
+        lines.push('- Look for Unicode characters that need normalization');
+        
+        console.log(lines.join('\n'));
+    }
+
     // aligned/align environments and render them directly via katex.render.
     renderResidualDisplayMath(root) {
         if (!root || !window || !window.katex) return;
@@ -536,6 +862,8 @@ class PresentationApp {
             const pre = this.protectMath(this.slides[index]);
             const htmlRaw = marked.parse(pre.text);
             const htmlRendered = this.renderPlaceholdersToKaTeX(htmlRaw, pre.placeholders);
+            // Validate math rendering and detect issues
+            this.validateMathRendering(htmlRendered, pre.placeholders);
             container.innerHTML = `<div class="slide">${htmlRendered}</div>`;
         }
 
@@ -850,19 +1178,19 @@ class PresentationApp {
                 switch (id) {
                     case 'ch7_lagrange_tangency':
                     case 'ch7_lagrange_tangency_plot':
-                        loader = () => import('../animations/chapters/ch7_lagrange_tangency_plot.js');
+                        // Dynamic import removed for static build
                         break;
                     case 'ch6_unconstrained_foc_plot':
-                        loader = () => import('../animations/chapters/ch6_unconstrained_foc_plot.js');
+                        // Dynamic import removed for static build
                         break;
                     case 'ch7_kkt_consumer_inequality':
-                        loader = () => import('../animations/chapters/ch7_kkt_consumer_inequality.js');
+                        // Dynamic import removed for static build
                         break;
                     default:
                         console.info('Unknown data-anim id:', id);
                         continue;
                 }
-                const mod = await loader();
+                // Using bundled animations instead
                 if (mod && typeof mod.init === 'function') {
                     const inst = mod.init(el, options) || { destroy() {} };
                     this.activeAnimInstances.push(inst);
@@ -1137,4 +1465,20 @@ class PresentationApp {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new PresentationApp();
+    // Expose error reporting function globally
+    window.dumpErrorReport = () => window.app.dumpErrorReport();
+    // Expose math testing function
+    window.testMath = (mathText) => {
+        const pre = window.app.protectMath(mathText);
+        console.log('Protected:', pre);
+        const html = marked.parse(pre.text);
+        console.log('Marked HTML:', html);
+        const rendered = window.app.renderPlaceholdersToKaTeX(html, pre.placeholders);
+        console.log('Final HTML:', rendered);
+        window.app.validateMathRendering(rendered, pre.placeholders);
+        return rendered;
+    };
 });
+
+
+})();

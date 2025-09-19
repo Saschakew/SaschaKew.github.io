@@ -474,6 +474,27 @@ body {
     font-size: 1.1em;
 }
 
+/* KaTeX error styling: subtle by default, aggressive only in debug mode */
+/* Default: do not turn whole equations red; indicate with a dotted underline */
+.katex-error {
+    color: inherit !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    text-decoration: underline dotted rgba(255, 107, 107, 0.8) !important;
+    text-underline-offset: 2px;
+}
+
+/* When body has .debug (or when ?debug=1 adds it), show stronger styling for easier spotting */
+body.debug .katex-error {
+    color: #ff6b6b !important;
+    background-color: rgba(255, 107, 107, 0.1) !important;
+    border: 1px solid rgba(255, 107, 107, 0.3) !important;
+    border-radius: 3px !important;
+    padding: 2px 4px !important;
+    font-size: 0.9em !important;
+}
+
 /* Animation Container */
 .animation-container {
     position: fixed;

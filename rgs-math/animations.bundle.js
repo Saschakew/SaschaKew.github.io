@@ -1,11 +1,10 @@
-// Auto-generated animations bundle for frozen build
+// Auto-generated animations bundle for CORS-free build
 (function(){
   window.__ANIMS__ = window.__ANIMS__ || {};
-})();
 
-// ch6_unconstrained_foc_plot.js
-(function(){
-// Chapter 6: Unconstrained Optimization — FOC Illustration (Observable Plot)
+  // ch6_unconstrained_foc_plot.js
+  (function(){
+    // Chapter 6: Unconstrained Optimization — FOC Illustration (Observable Plot)
 // Public API: init(containerEl, options) -> { destroy }
 // Visual: Single panel with profit contours for π(K,L), current point, gradient ∇π, and stationary point (K*,L*).
 // Libraries: Observable Plot (window.Plot) and d3 (window.d3) loaded via CDN in presentation/index.html.
@@ -296,20 +295,20 @@ function init(containerEl, options = {}) {
   };
 }
 
-  try {
-    var api = (typeof init === 'function') ? { init: init } : (typeof module !== 'undefined' && module.exports ? module.exports : {});
-    if (api && typeof api.init === 'function') {
-      window.__ANIMS__ = window.__ANIMS__ || {};
-      window.__ANIMS__['ch6_unconstrained_foc_plot'] = { init: api.init };
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch6_unconstrained_foc_plot'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch6_unconstrained_foc_plot');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch6_unconstrained_foc_plot', e);
     }
-  } catch (e) {
-    console.error('Failed to register animation ch6_unconstrained_foc_plot', e);
-  }
-})();
+  })();
 
-// ch7_kkt_consumer_inequality.js
-(function(){
-// Chapter 7: KKT Consumer Inequality (2x + 3y ≤ I)
+  // ch7_kkt_consumer_inequality.js
+  (function(){
+    // Chapter 7: KKT Consumer Inequality (2x + 3y ≤ I)
 // Public API: init(containerEl, options) -> { destroy }
 // Visualization goals:
 // - Show budget line 2x + 3y = I and shade the feasible region (≤) in the first quadrant.
@@ -713,20 +712,20 @@ function init(containerEl, options = {}) {
   };
 }
 
-  try {
-    var api = (typeof init === 'function') ? { init: init } : (typeof module !== 'undefined' && module.exports ? module.exports : {});
-    if (api && typeof api.init === 'function') {
-      window.__ANIMS__ = window.__ANIMS__ || {};
-      window.__ANIMS__['ch7_kkt_consumer_inequality'] = { init: api.init };
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_kkt_consumer_inequality'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_kkt_consumer_inequality');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_kkt_consumer_inequality', e);
     }
-  } catch (e) {
-    console.error('Failed to register animation ch7_kkt_consumer_inequality', e);
-  }
-})();
+  })();
 
-// ch7_lagrange_tangency.js
-(function(){
-// Chapter 7: Lagrange Tangency (module skeleton)
+  // ch7_lagrange_tangency.js
+  (function(){
+    // Chapter 7: Lagrange Tangency (module skeleton)
 // Public API: init(containerEl, options) -> { destroy }
 // This is a minimal scaffold to verify module loading. We'll wire the full logic next.
 
@@ -1216,20 +1215,20 @@ function init(containerEl, options = {}) {
   };
 }
 
-  try {
-    var api = (typeof init === 'function') ? { init: init } : (typeof module !== 'undefined' && module.exports ? module.exports : {});
-    if (api && typeof api.init === 'function') {
-      window.__ANIMS__ = window.__ANIMS__ || {};
-      window.__ANIMS__['ch7_lagrange_tangency'] = { init: api.init };
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_lagrange_tangency'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_lagrange_tangency');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_lagrange_tangency', e);
     }
-  } catch (e) {
-    console.error('Failed to register animation ch7_lagrange_tangency', e);
-  }
-})();
+  })();
 
-// ch7_lagrange_tangency_plot.js
-(function(){
-// Chapter 7: Lagrange Tangency — Observable Plot renderer
+  // ch7_lagrange_tangency_plot.js
+  (function(){
+    // Chapter 7: Lagrange Tangency — Observable Plot renderer
 // Public API: init(containerEl, options) -> { destroy }
 // Visual goals: minimal, elegant, lightweight; single panel with budget, indifference, and current point.
 // Framework: Observable Plot (SVG). Loaded globally via CDN as window.Plot.
@@ -1534,13 +1533,15 @@ function init(containerEl, options = {}) {
   };
 }
 
-  try {
-    var api = (typeof init === 'function') ? { init: init } : (typeof module !== 'undefined' && module.exports ? module.exports : {});
-    if (api && typeof api.init === 'function') {
-      window.__ANIMS__ = window.__ANIMS__ || {};
-      window.__ANIMS__['ch7_lagrange_tangency_plot'] = { init: api.init };
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_lagrange_tangency_plot'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_lagrange_tangency_plot');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_lagrange_tangency_plot', e);
     }
-  } catch (e) {
-    console.error('Failed to register animation ch7_lagrange_tangency_plot', e);
-  }
+  })();
+
 })();
