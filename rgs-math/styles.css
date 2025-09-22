@@ -185,9 +185,17 @@ body {
     z-index: 90;
 }
 
+/* Collapsed state for right TOC */
+.chapter-toc.collapsed {
+    transform: translateX(var(--toc-width));
+}
+
 .toc-header {
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .toc-header h3 {
@@ -256,6 +264,45 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
+    /* Keep layout stable when scrollbars appear */
+    scrollbar-gutter: stable both-edges;
+    /* Firefox custom scrollbar */
+    scrollbar-width: thin; /* auto | thin | none */
+    scrollbar-color: var(--border-color) transparent; /* thumb | track */
+}
+
+/* On hover, subtly accent the scrollbar in Firefox */
+.slide-container:hover {
+    scrollbar-color: var(--text-accent) transparent;
+}
+
+/* WebKit-based browsers (Chromium, Safari, Edge) */
+.slide-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.slide-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.slide-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 8px;
+    border: 2px solid transparent; /* creates visual padding */
+    background-clip: padding-box;
+}
+
+.slide-container:hover::-webkit-scrollbar-thumb {
+    background: var(--text-accent);
+}
+
+.slide-container::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, var(--text-accent), #7aa7ff);
+}
+
+.slide-container::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 /* Slide Styling */
@@ -769,6 +816,9 @@ body.debug .katex-error {
     opacity: 1;
 }
 
+/* Hide edge toggles in fullscreen to keep it distraction-free */
+.fullscreen .edge-toggle { display: none !important; }
+
 /* Print Styles */
 @media print {
     .navigation,
@@ -787,4 +837,50 @@ body.debug .katex-error {
         page-break-after: always;
         min-height: auto;
     }
+}
+
+/* Side collapse buttons in headers */
+.side-collapse-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+}
+
+.side-collapse-btn:hover {
+    background: var(--text-accent);
+    color: var(--bg-primary);
+}
+
+/* Edge expand toggles (shown when collapsed) */
+.edge-toggle {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none; /* toggled via .show */
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 16px var(--shadow-color);
+    z-index: 110; /* above sidebars */
+    cursor: pointer;
+}
+
+.edge-toggle.left { left: 8px; }
+.edge-toggle.right { right: 8px; }
+
+.edge-toggle.show { display: inline-flex; }
+
+.edge-toggle:hover {
+    background: var(--text-accent);
+    color: var(--bg-primary);
 }

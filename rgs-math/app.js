@@ -39,6 +39,8 @@ class PresentationApp {
         this.setupTheme();
         await this.loadChapters();
         this.setupEventListeners();
+        // Apply persisted sidebar states (collapsed/expanded)
+        this.applySidebarState();
         this.setupKeyboardShortcuts();
         this.setupLiveReload();
         
@@ -845,6 +847,11 @@ class PresentationApp {
     renderSlide(index) {
         this.currentSlide = index;
         const container = document.getElementById('slide-container');
+        // Always scroll the slide container to the top when changing slides
+        if (container) {
+            try { container.scrollTo({ top: 0, behavior: 'smooth' }); }
+            catch (_) { try { container.scrollTop = 0; } catch(__) {} }
+        }
         if (!this.slides || !this.slides[index]) {
             container.innerHTML = '<div class="slide"><p>No content.</p></div>';
             this.updateControls();
@@ -1341,11 +1348,28 @@ class PresentationApp {
     }
 
     setupEventListeners() {
-        // Navigation toggle
-        document.getElementById('nav-toggle').addEventListener('click', () => {
-            document.getElementById('navigation').classList.toggle('collapsed');
-        });
-        
+        // Left collapse button
+        const leftCollapseBtn = document.getElementById('left-collapse-btn');
+        if (leftCollapseBtn) {
+            leftCollapseBtn.addEventListener('click', () => this.setLeftCollapsed(true));
+        }
+
+        // Right collapse button
+        const rightCollapseBtn = document.getElementById('right-collapse-btn');
+        if (rightCollapseBtn) {
+            rightCollapseBtn.addEventListener('click', () => this.setRightCollapsed(true));
+        }
+
+        // Edge expand toggles
+        const leftExpand = document.getElementById('left-expand-toggle');
+        if (leftExpand) {
+            leftExpand.addEventListener('click', () => this.setLeftCollapsed(false));
+        }
+        const rightExpand = document.getElementById('right-expand-toggle');
+        if (rightExpand) {
+            rightExpand.addEventListener('click', () => this.setRightCollapsed(false));
+        }
+
         // Example animation button (global)
         const exampleBtn = document.getElementById('example-animation-btn');
         if (exampleBtn) {
@@ -1361,11 +1385,6 @@ class PresentationApp {
             this.setupTheme();
         });
         
-        // Fullscreen toggle
-        document.getElementById('fullscreen-toggle').addEventListener('click', () => {
-            this.toggleFullscreen();
-        });
-        
         // Slide navigation
         document.getElementById('prev-slide').addEventListener('click', () => {
             this.navigateSlide(-1);
@@ -1379,6 +1398,40 @@ class PresentationApp {
         document.getElementById('close-animation').addEventListener('click', () => {
             document.getElementById('animation-container').classList.add('hidden');
         });
+    }
+
+    // Sidebar state helpers
+    applySidebarState() {
+        const leftCollapsed = localStorage.getItem('leftCollapsed') === '1';
+        const rightCollapsed = localStorage.getItem('rightCollapsed') === '1';
+        const nav = document.getElementById('navigation');
+        const toc = document.getElementById('chapter-toc');
+        if (nav) nav.classList.toggle('collapsed', !!leftCollapsed);
+        if (toc) toc.classList.toggle('collapsed', !!rightCollapsed);
+        this.updateEdgeToggles();
+    }
+
+    setLeftCollapsed(flag) {
+        try { localStorage.setItem('leftCollapsed', flag ? '1' : '0'); } catch (_) {}
+        const nav = document.getElementById('navigation');
+        if (nav) nav.classList.toggle('collapsed', !!flag);
+        this.updateEdgeToggles();
+    }
+
+    setRightCollapsed(flag) {
+        try { localStorage.setItem('rightCollapsed', flag ? '1' : '0'); } catch (_) {}
+        const toc = document.getElementById('chapter-toc');
+        if (toc) toc.classList.toggle('collapsed', !!flag);
+        this.updateEdgeToggles();
+    }
+
+    updateEdgeToggles() {
+        const leftCollapsed = document.getElementById('navigation')?.classList.contains('collapsed');
+        const rightCollapsed = document.getElementById('chapter-toc')?.classList.contains('collapsed');
+        const leftExpand = document.getElementById('left-expand-toggle');
+        const rightExpand = document.getElementById('right-expand-toggle');
+        if (leftExpand) leftExpand.classList.toggle('show', !!leftCollapsed);
+        if (rightExpand) rightExpand.classList.toggle('show', !!rightCollapsed);
     }
 
     setupKeyboardShortcuts() {
@@ -1399,17 +1452,8 @@ class PresentationApp {
                 case 'ArrowDown':
                     this.navigateChapter(1);
                     break;
-                case 'f':
-                case 'F':
-                    if (!e.ctrlKey && !e.metaKey) {
-                        this.toggleFullscreen();
-                    }
-                    break;
                 case 'Escape':
                     document.getElementById('animation-container').classList.add('hidden');
-                    if (this.isFullscreen) {
-                        this.toggleFullscreen();
-                    }
                     break;
                 case 't':
                 case 'T':
