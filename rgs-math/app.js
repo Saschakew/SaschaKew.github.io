@@ -18,19 +18,6 @@ class PresentationApp {
         this.unlockedSolutions = {};   // keyed by chapter number (boolean)
         // Track active animation module instances to clean up on slide change
         this.activeAnimInstances = [];
-        
-        // Quiet verbose logs by default; enable with ?debug=1
-        try {
-            const qs = (typeof location !== 'undefined' ? location.search : '') || '';
-            const debugOn = /(?:^|[?&])debug=1(?:&|$)/.test(qs);
-            window.__MATH_DEBUG__ = debugOn;
-            if (!debugOn && typeof console !== 'undefined') {
-                const noop = function(){};
-                // Keep warnings/errors, silence console.log/info
-                try { console.log = noop; } catch(_) {}
-                try { console.info = noop; } catch(_) {}
-            }
-        } catch(_) {}
 
         this.init();
     }
@@ -39,7 +26,7 @@ class PresentationApp {
         this.setupTheme();
         await this.loadChapters();
         this.setupEventListeners();
-        // Apply persisted sidebar states (collapsed/expanded)
+        // Initialize new sidebar state (body data-attributes)
         this.applySidebarState();
         this.setupKeyboardShortcuts();
         this.setupLiveReload();
@@ -134,7 +121,8 @@ class PresentationApp {
     }
 
     async loadChapter(chapterIndex) {
-        this.currentChapter = chapterIndex;
+        // Preserve current sidebar collapsed state across chapter loads
+this.currentChapter = chapterIndex;
         this.currentSlide = 0;
         localStorage.setItem('currentChapter', chapterIndex);
         
@@ -838,9 +826,14 @@ class PresentationApp {
         tocList.querySelectorAll('.toc-item').forEach(el => el.classList.remove('active'));
         const active = tocList.querySelector(`.toc-item[data-index="${index}"]`);
         if (active) active.classList.add('active');
-        const toScroll = tocList.querySelector('.toc-item.active');
-        if (toScroll && typeof toScroll.scrollIntoView === 'function') {
-            toScroll.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        // Avoid scrolling the (hidden) right TOC into view when it's collapsed,
+        // which can cause horizontal page shifts.
+        const rightState = (document.body && document.body.getAttribute('data-right')) || 'expanded';
+        if (rightState !== 'collapsed') {
+            const toScroll = tocList.querySelector('.toc-item.active');
+            if (toScroll && typeof toScroll.scrollIntoView === 'function') {
+                toScroll.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
         }
     }
 
@@ -1033,6 +1026,29 @@ class PresentationApp {
         // Animations disabled: ignore any per-slide buttons (only global example remains)
         this.updateControls();
         this.updateTOCActive(index);
+        // Re-enforce sidebar state after slide render to prevent accidental expansion
+        try {
+            const nav = document.getElementById('navigation');
+            const toc = document.getElementById('chapter-toc');
+            if (nav) {
+                if (this.leftCollapsed) {
+                    nav.style.transform = 'translateX(-100%)';
+                    nav.style.pointerEvents = 'none';
+                } else {
+                    nav.style.transform = '';
+                    nav.style.pointerEvents = '';
+                }
+            }
+            if (toc) {
+                if (this.rightCollapsed) {
+                    toc.style.transform = 'translateX(100%)';
+                    toc.style.pointerEvents = 'none';
+                } else {
+                    toc.style.transform = '';
+                    toc.style.pointerEvents = '';
+                }
+            }
+        } catch(_) {}
     }
 
     // Determine where a list immediately follows a paragraph in the original
@@ -1348,26 +1364,16 @@ class PresentationApp {
     }
 
     setupEventListeners() {
-        // Left collapse button
-        const leftCollapseBtn = document.getElementById('left-collapse-btn');
-        if (leftCollapseBtn) {
-            leftCollapseBtn.addEventListener('click', () => this.setLeftCollapsed(true));
+        try { console.info('[App] Binding UI listeners'); } catch(_) {}
+        // Bind new global toggles
+        const toggleLeft = document.getElementById('toggle-left');
+        const toggleRight = document.getElementById('toggle-right');
+        try { console.log('[SIDEBAR] toggle-left present:', !!toggleLeft, 'toggle-right present:', !!toggleRight); } catch(_) {}
+        if (toggleLeft) {
+            toggleLeft.addEventListener('click', () => this.setLeftCollapsed(!this.leftCollapsed));
         }
-
-        // Right collapse button
-        const rightCollapseBtn = document.getElementById('right-collapse-btn');
-        if (rightCollapseBtn) {
-            rightCollapseBtn.addEventListener('click', () => this.setRightCollapsed(true));
-        }
-
-        // Edge expand toggles
-        const leftExpand = document.getElementById('left-expand-toggle');
-        if (leftExpand) {
-            leftExpand.addEventListener('click', () => this.setLeftCollapsed(false));
-        }
-        const rightExpand = document.getElementById('right-expand-toggle');
-        if (rightExpand) {
-            rightExpand.addEventListener('click', () => this.setRightCollapsed(false));
+        if (toggleRight) {
+            toggleRight.addEventListener('click', () => this.setRightCollapsed(!this.rightCollapsed));
         }
 
         // Example animation button (global)
@@ -1400,38 +1406,91 @@ class PresentationApp {
         });
     }
 
-    // Sidebar state helpers
+    // Sidebar state via body data-attributes (fresh mechanism)
+    // Storage keys: leftCollapsed_v2, rightCollapsed_v2 ('1' collapsed, '0' expanded)
     applySidebarState() {
-        const leftCollapsed = localStorage.getItem('leftCollapsed') === '1';
-        const rightCollapsed = localStorage.getItem('rightCollapsed') === '1';
-        const nav = document.getElementById('navigation');
-        const toc = document.getElementById('chapter-toc');
-        if (nav) nav.classList.toggle('collapsed', !!leftCollapsed);
-        if (toc) toc.classList.toggle('collapsed', !!rightCollapsed);
+        const leftStr = localStorage.getItem('leftCollapsed_v2');
+        const rightStr = localStorage.getItem('rightCollapsed_v2');
+        this.leftCollapsed = (leftStr === '1');
+        this.rightCollapsed = (rightStr === '1');
+        // Default to expanded if unset
+        if (leftStr === null) this.leftCollapsed = false;
+        if (rightStr === null) this.rightCollapsed = false;
+        try { console.log('[SIDEBAR] applySidebarState -> left:', this.leftCollapsed, 'right:', this.rightCollapsed); } catch(_) {}
+        document.body.setAttribute('data-left', this.leftCollapsed ? 'collapsed' : 'expanded');
+        document.body.setAttribute('data-right', this.rightCollapsed ? 'collapsed' : 'expanded');
+        // Apply inline transforms as a secondary enforcement to avoid CSS specificity issues
+        try {
+            const nav = document.getElementById('navigation');
+            const toc = document.getElementById('chapter-toc');
+            if (nav) {
+                if (this.leftCollapsed) {
+                    nav.style.transform = 'translateX(-100%)';
+                    nav.style.pointerEvents = 'none';
+                } else {
+                    nav.style.transform = '';
+                    nav.style.pointerEvents = '';
+                }
+            }
+            if (toc) {
+                if (this.rightCollapsed) {
+                    toc.style.transform = 'translateX(100%)';
+                    toc.style.pointerEvents = 'none';
+                } else {
+                    toc.style.transform = '';
+                    toc.style.pointerEvents = '';
+                }
+            }
+        } catch(_) {}
         this.updateEdgeToggles();
     }
 
     setLeftCollapsed(flag) {
-        try { localStorage.setItem('leftCollapsed', flag ? '1' : '0'); } catch (_) {}
-        const nav = document.getElementById('navigation');
-        if (nav) nav.classList.toggle('collapsed', !!flag);
+        // New mechanism: set body data attribute and persist v2 key
+        this.leftCollapsed = !!flag;
+        try { localStorage.setItem('leftCollapsed_v2', this.leftCollapsed ? '1' : '0'); } catch(_) {}
+        document.body.setAttribute('data-left', this.leftCollapsed ? 'collapsed' : 'expanded');
+        try { console.log('[SIDEBAR] Left set to', this.leftCollapsed ? 'collapsed' : 'expanded'); } catch(_) {}
+        // Inline transform enforcement
+        try {
+            const nav = document.getElementById('navigation');
+            if (nav) {
+                if (this.leftCollapsed) {
+                    nav.style.transform = 'translateX(-100%)';
+                    nav.style.pointerEvents = 'none';
+                } else {
+                    nav.style.transform = '';
+                    nav.style.pointerEvents = '';
+                }
+            }
+        } catch(_) {}
         this.updateEdgeToggles();
     }
 
     setRightCollapsed(flag) {
-        try { localStorage.setItem('rightCollapsed', flag ? '1' : '0'); } catch (_) {}
-        const toc = document.getElementById('chapter-toc');
-        if (toc) toc.classList.toggle('collapsed', !!flag);
+        // New mechanism: set body data attribute and persist v2 key
+        this.rightCollapsed = !!flag;
+        try { localStorage.setItem('rightCollapsed_v2', this.rightCollapsed ? '1' : '0'); } catch(_) {}
+        document.body.setAttribute('data-right', this.rightCollapsed ? 'collapsed' : 'expanded');
+        try { console.log('[SIDEBAR] Right set to', this.rightCollapsed ? 'collapsed' : 'expanded'); } catch(_) {}
+        // Inline transform enforcement
+        try {
+            const toc = document.getElementById('chapter-toc');
+            if (toc) {
+                if (this.rightCollapsed) {
+                    toc.style.transform = 'translateX(100%)';
+                    toc.style.pointerEvents = 'none';
+                } else {
+                    toc.style.transform = '';
+                    toc.style.pointerEvents = '';
+                }
+            }
+        } catch(_) {}
         this.updateEdgeToggles();
     }
 
     updateEdgeToggles() {
-        const leftCollapsed = document.getElementById('navigation')?.classList.contains('collapsed');
-        const rightCollapsed = document.getElementById('chapter-toc')?.classList.contains('collapsed');
-        const leftExpand = document.getElementById('left-expand-toggle');
-        const rightExpand = document.getElementById('right-expand-toggle');
-        if (leftExpand) leftExpand.classList.toggle('show', !!leftCollapsed);
-        if (rightExpand) rightExpand.classList.toggle('show', !!rightCollapsed);
+        // No edge toggles; nothing to do. Kept for compatibility.
     }
 
     setupKeyboardShortcuts() {
