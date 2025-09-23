@@ -15,6 +15,17 @@
     --toc-width: 300px;
 }
 
+/* Use chevrons that match the collapse buttons for better visual consistency */
+.edge-toggle::before {
+    content: '';
+    font-size: 1.1rem;
+    line-height: 1;
+    display: inline-block;
+    color: currentColor;
+}
+.edge-toggle.left::before { content: '\276F'; }  /* ⟩ */
+.edge-toggle.right::before { content: '\276E'; } /* ⟨ */
+
 /* Light Theme */
 [data-theme="light"] {
     --bg-primary: #ffffff;
@@ -185,9 +196,17 @@ body {
     z-index: 90;
 }
 
+/* Collapsed state for right TOC */
+.chapter-toc.collapsed {
+    transform: translateX(var(--toc-width));
+}
+
 .toc-header {
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .toc-header h3 {
@@ -256,6 +275,45 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
+    /* Keep layout stable when scrollbars appear */
+    scrollbar-gutter: stable both-edges;
+    /* Firefox custom scrollbar */
+    scrollbar-width: thin; /* auto | thin | none */
+    scrollbar-color: var(--border-color) transparent; /* thumb | track */
+}
+
+/* On hover, subtly accent the scrollbar in Firefox */
+.slide-container:hover {
+    scrollbar-color: var(--text-accent) transparent;
+}
+
+/* WebKit-based browsers (Chromium, Safari, Edge) */
+.slide-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.slide-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.slide-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 8px;
+    border: 2px solid transparent; /* creates visual padding */
+    background-clip: padding-box;
+}
+
+.slide-container:hover::-webkit-scrollbar-thumb {
+    background: var(--text-accent);
+}
+
+.slide-container::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(135deg, var(--text-accent), #7aa7ff);
+}
+
+.slide-container::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 /* Slide Styling */
@@ -751,6 +809,50 @@ body.debug .katex-error {
     }
 }
 
+/* New attribute-driven sidebar collapse (v2) - Absolute positioning to prevent layout shifts */
+.navigation {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 100 !important;
+}
+
+.chapter-toc {
+    position: absolute !important;
+    right: 0 !important;
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 90 !important;
+}
+
+.content {
+    margin-left: var(--nav-width) !important;
+    margin-right: var(--toc-width) !important;
+}
+
+body[data-left='collapsed'] #navigation {
+    transform: translateX(-100%) !important;
+    pointer-events: none !important;
+}
+
+body[data-left='collapsed'] .content {
+    margin-left: 0 !important;
+}
+
+body[data-right='collapsed'] #chapter-toc {
+    transform: translateX(100%) !important;
+    pointer-events: none !important;
+}
+
+body[data-right='collapsed'] .content {
+    margin-right: 0 !important;
+}
+
+/* Ensure toggles (if any) are hidden; we no longer use edge toggles */
+body #left-expand-toggle,
+body #right-expand-toggle { display: none !important; }
+
 /* Fullscreen Mode */
 .fullscreen .navigation {
     transform: translateX(calc(-1 * var(--nav-width)));
@@ -768,6 +870,9 @@ body.debug .katex-error {
 .fullscreen:hover .presentation-controls {
     opacity: 1;
 }
+
+/* Hide edge toggles in fullscreen to keep it distraction-free */
+.fullscreen .edge-toggle { display: none !important; }
 
 /* Print Styles */
 @media print {
@@ -788,3 +893,83 @@ body.debug .katex-error {
         min-height: auto;
     }
 }
+
+/* Side collapse buttons in headers */
+.side-collapse-btn {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+}
+
+.side-collapse-btn:hover {
+    background: var(--text-accent);
+    color: var(--bg-primary);
+}
+
+/* Edge expand toggles (shown when collapsed) */
+.edge-toggle {
+    position: fixed;
+    top: 12px; /* place near the top, below progress bar */
+    transform: none;
+    display: none; /* toggled via .show */
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(20,20,20,0.6);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.6rem;
+    box-shadow: 0 6px 20px var(--shadow-color), inset 0 0 0 1px rgba(255,255,255,0.03);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 110; /* New attribute-driven sidebar collapse (v2) */
+    cursor: pointer;
+    font-size: 0; /* hide fallback glyph text */
+    font-weight: 700;
+    line-height: 1;
+    transition: background var(--animation-duration) ease, color var(--animation-duration) ease, transform var(--animation-duration) ease, box-shadow var(--animation-duration) ease;
+}
+
+.edge-toggle.left { left: 8px; }
+.edge-toggle.right { right: 8px; }
+
+.edge-toggle.show { display: inline-flex; }
+
+.edge-toggle:hover {
+    background: var(--text-accent);
+    color: var(--bg-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px var(--shadow-color);
+}
+
+.edge-toggle:active {
+    transform: translateY(0);
+}
+
+.edge-toggle:focus-visible {
+    outline: 2px solid var(--text-accent);
+    outline-offset: 2px;
+}
+
+/* Light theme tune-up for glass background */
+[data-theme="light"] .edge-toggle {
+    background: rgba(255,255,255,0.7);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.03);
+}
+
+/* Clean Sidebar Management - Work with existing CSS */
+
+/* Default state: edge toggles hidden */
+.edge-toggle { display: none !important; }
+
+/* When sidebar is collapsed, show corresponding edge toggle */
+#navigation.collapsed ~ #left-expand-toggle { display: flex !important; }
+#chapter-toc.collapsed ~ #right-expand-toggle { display: flex !important; }
+
+/* Don't override existing collapsed transforms - they work fine */
