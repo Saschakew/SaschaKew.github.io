@@ -35,4 +35,4 @@ This is an enhanced static build with improved math processing that works direct
 This build embeds all content directly in the HTML file and uses enhanced
 math processing to handle complex LaTeX constructs like matrices and subscripts.
 
-Generated: 2025-09-23T19:41:19.191Z
+Generated: 2025-09-22T11:42:05.342Z

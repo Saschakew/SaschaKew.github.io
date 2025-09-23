@@ -809,50 +809,6 @@ body.debug .katex-error {
     }
 }
 
-/* New attribute-driven sidebar collapse (v2) - Absolute positioning to prevent layout shifts */
-.navigation {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    height: 100vh !important;
-    z-index: 100 !important;
-}
-
-.chapter-toc {
-    position: absolute !important;
-    right: 0 !important;
-    top: 0 !important;
-    height: 100vh !important;
-    z-index: 90 !important;
-}
-
-.content {
-    margin-left: var(--nav-width) !important;
-    margin-right: var(--toc-width) !important;
-}
-
-body[data-left='collapsed'] #navigation {
-    transform: translateX(-100%) !important;
-    pointer-events: none !important;
-}
-
-body[data-left='collapsed'] .content {
-    margin-left: 0 !important;
-}
-
-body[data-right='collapsed'] #chapter-toc {
-    transform: translateX(100%) !important;
-    pointer-events: none !important;
-}
-
-body[data-right='collapsed'] .content {
-    margin-right: 0 !important;
-}
-
-/* Ensure toggles (if any) are hidden; we no longer use edge toggles */
-body #left-expand-toggle,
-body #right-expand-toggle { display: none !important; }
-
 /* Fullscreen Mode */
 .fullscreen .navigation {
     transform: translateX(calc(-1 * var(--nav-width)));
@@ -928,7 +884,7 @@ body #right-expand-toggle { display: none !important; }
     box-shadow: 0 6px 20px var(--shadow-color), inset 0 0 0 1px rgba(255,255,255,0.03);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
-    z-index: 110; /* New attribute-driven sidebar collapse (v2) */
+    z-index: 110; /* above sidebars */
     cursor: pointer;
     font-size: 0; /* hide fallback glyph text */
     font-weight: 700;
@@ -962,14 +918,3 @@ body #right-expand-toggle { display: none !important; }
     background: rgba(255,255,255,0.7);
     box-shadow: 0 6px 20px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.03);
 }
-
-/* Clean Sidebar Management - Work with existing CSS */
-
-/* Default state: edge toggles hidden */
-.edge-toggle { display: none !important; }
-
-/* When sidebar is collapsed, show corresponding edge toggle */
-#navigation.collapsed ~ #left-expand-toggle { display: flex !important; }
-#chapter-toc.collapsed ~ #right-expand-toggle { display: flex !important; }
-
-/* Don't override existing collapsed transforms - they work fine */
