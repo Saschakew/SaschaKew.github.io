@@ -1198,7 +1198,14 @@ this.currentChapter = chapterIndex;
                 // Frozen build path: load from pre-bundled registry to avoid dynamic import/file origin issues
                 if (this.frozen && typeof window !== 'undefined' && window.__ANIMS__) {
                     const alias = {
-                        'ch7_lagrange_tangency': 'ch7_lagrange_tangency_plot'
+                        'ch7_lagrange_tangency': 'ch7_lagrange_tangency_plot',
+                        'ch2_completeness_gap': 'ch2_completeness_gap',
+                        'ch2_sup_inf_explorer': 'ch2_sup_inf_explorer',
+                        'ch2_function_mapping': 'ch2_function_mapping',
+                        'ch2_metric_open_ball': 'ch2_metric_open_ball',
+                        'ch2_epsilon_band': 'ch2_epsilon_band',
+                        'ch2_monotone_convergence': 'ch2_monotone_convergence',
+                        'ch2_bolzano_subsequence': 'ch2_bolzano_subsequence'
                     };
                     const key = (window.__ANIMS__[id]) ? id : (alias[id] || null);
                     if (key && window.__ANIMS__[key] && typeof window.__ANIMS__[key].init === 'function') {
@@ -1215,6 +1222,27 @@ this.currentChapter = chapterIndex;
                 switch (id) {
                     case 'ch7_lagrange_tangency':
                     case 'ch7_lagrange_tangency_plot':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch2_completeness_gap':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch2_sup_inf_explorer':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch2_function_mapping':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch2_metric_open_ball':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch2_epsilon_band':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch2_monotone_convergence':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch2_bolzano_subsequence':
                         // Dynamic import removed for static build
                         break;
                     case 'ch6_unconstrained_foc_plot':

@@ -2,6 +2,1778 @@
 (function(){
   window.__ANIMS__ = window.__ANIMS__ || {};
 
+  // ch2_bolzano_subsequence.js
+  (function(){
+    // Chapter 2: Bolzano–Weierstrass Subsequence Selector
+// Public API: init(containerEl, options) -> { destroy }
+// Visual goal: show bounded sequences and highlight convergent subsequences selected by pattern.
+
+function init(containerEl, options = {}) {
+  if (!containerEl) {
+    return { destroy() {} };
+  }
+
+  const SEQUENCES = [
+    {
+      id: 'alternating',
+      label: 'xₙ = (−1)ⁿ',
+      generator: (n) => ((n % 2 === 0) ? 1 : -1)
+    },
+    {
+      id: 'sine',
+      label: 'xₙ = sin(n)',
+      generator: (n) => Math.sin(n)
+    },
+    {
+      id: 'cosine',
+      label: 'xₙ = cos(n)',
+      generator: (n) => Math.cos(n)
+    }
+  ];
+
+  const SUBSEQUENCES = [
+    { id: 'even', label: 'Even indices', predicate: (n) => n % 2 === 0 },
+    { id: 'odd', label: 'Odd indices', predicate: (n) => n % 2 === 1 },
+    { id: 'mod3', label: 'Every third term', predicate: (n) => n % 3 === 0 },
+    { id: 'mod4', label: 'Every fourth term', predicate: (n) => n % 4 === 0 }
+  ];
+
+  const defaults = {
+    sequenceId: 'alternating',
+    subsequenceId: 'even',
+    nMax: 80
+  };
+
+  const state = {
+    sequenceId: SEQUENCES.some(s => s.id === options.sequenceId) ? options.sequenceId : defaults.sequenceId,
+    subsequenceId: SUBSEQUENCES.some(s => s.id === options.subsequenceId) ? options.subsequenceId : defaults.subsequenceId,
+    nMax: clampInt(options.nMax ?? defaults.nMax, 30, 200)
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:center; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:240px;">
+          <span style="min-width:10ch; text-align:right; color: var(--text-secondary);">Sequence</span>
+          <select data-role="sequence" aria-label="Select base sequence" style="flex:1;">
+            ${SEQUENCES.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:240px;">
+          <span style="min-width:11ch; text-align:right; color: var(--text-secondary);">Subsequence</span>
+          <select data-role="subseq" aria-label="Select subsequence" style="flex:1;">
+            ${SUBSEQUENCES.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.4rem; min-width:200px;">
+          <span style="min-width:6ch; text-align:right; color: var(--text-secondary);">nₘₐₓ</span>
+          <input type="range" min="30" max="200" step="10" value="${state.nMax}" data-role="nmax" aria-label="Number of terms" />
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="flex:1 1 220px; color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvas" data-role="plot" style="margin-top:0.75rem;"></div>
+      <div class="anim__caption" style="margin-top:0.35rem; color: var(--text-secondary);">
+        Bolzano–Weierstrass guarantees every bounded sequence has a convergent subsequence. Highlight subsequences and observe convergence.
+      </div>
+    </div>
+  `;
+
+  const sequenceSelect = containerEl.querySelector('[data-role=sequence]');
+  const subseqSelect = containerEl.querySelector('[data-role=subseq]');
+  const nMaxInput = containerEl.querySelector('[data-role=nmax]');
+  const liveRegion = containerEl.querySelector('[data-role=live]');
+  const plotMount = containerEl.querySelector('[data-role=plot]');
+
+  if (sequenceSelect) sequenceSelect.value = state.sequenceId;
+  if (subseqSelect) subseqSelect.value = state.subsequenceId;
+
+  const Plot = (typeof window !== 'undefined' && window.Plot) ? window.Plot : null;
+  if (!Plot) {
+    if (plotMount) {
+      plotMount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded. Include Observable Plot to display this animation.</div>';
+    }
+    return { destroy() { containerEl.innerHTML = ''; } };
+  }
+
+  function clampInt(value, min, max) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return min;
+    return Math.min(max, Math.max(min, Math.round(num)));
+  }
+
+  function buildSequenceData(sequenceId, nMax) {
+    const seq = SEQUENCES.find(s => s.id === sequenceId) || SEQUENCES[0];
+    const data = [];
+    for (let n = 1; n <= nMax; n += 1) {
+      data.push({ n, value: seq.generator(n), label: `n=${n}` });
+    }
+    return data;
+  }
+
+  function buildSubsequenceData(sequenceData, subsequenceId) {
+    const subseq = SUBSEQUENCES.find(s => s.id === subsequenceId) || SUBSEQUENCES[0];
+    const selected = sequenceData.filter(({ n }) => subseq.predicate(n));
+    const limitEstimate = computeLimitEstimate(selected);
+    return { selected, limitEstimate, predicateLabel: subseq.label };
+  }
+
+  function computeLimitEstimate(points) {
+    if (!points.length) return null;
+    const tail = points.slice(-10);
+    const avg = tail.reduce((acc, { value }) => acc + value, 0) / tail.length;
+    return avg;
+  }
+
+  let currentPlot = null;
+
+  function render() {
+    const sequenceData = buildSequenceData(state.sequenceId, state.nMax);
+    const { selected, limitEstimate } = buildSubsequenceData(sequenceData, state.subsequenceId);
+
+    const width = Math.min(760, Math.max(520, (plotMount?.clientWidth || 560)));
+    const height = Math.round(width * 0.55);
+
+    const marks = [
+      Plot.dot(sequenceData, { x: 'n', y: 'value', r: 3.5, fill: '#94a3b8', stroke: 'white', strokeWidth: 1, opacity: 0.8 }),
+      Plot.dot(selected, { x: 'n', y: 'value', r: 5, fill: '#0b7285', stroke: 'white', strokeWidth: 1.6 }),
+      Plot.text(selected.slice(-5), { x: 'n', y: 'value', text: 'label', dy: -10, fill: '#0b7285', fontSize: 11, textAnchor: 'center' })
+    ];
+
+    if (Number.isFinite(limitEstimate)) {
+      marks.push(Plot.ruleY([limitEstimate], { stroke: '#6f42c1', strokeWidth: 1.8, strokeDasharray: '4 3' }));
+      marks.push(Plot.text([{ n: state.nMax * 0.85, label: `lim subseq ≈ ${limitEstimate.toFixed(3)}` }], {
+        x: 'n',
+        y: () => limitEstimate + 0.1,
+        text: 'label',
+        fill: '#6f42c1',
+        fontSize: 12,
+        textAnchor: 'start'
+      }));
+    }
+
+    const plot = Plot.plot({
+      width,
+      height,
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      x: { domain: [1, state.nMax], nice: true, grid: true, label: 'n' },
+      y: { domain: [-1.2, 1.2], nice: true, grid: true, label: 'xₙ' },
+      marks
+    });
+
+    if (currentPlot) {
+      try { currentPlot.remove(); } catch (_) {}
+    }
+    if (plotMount) {
+      plotMount.innerHTML = '';
+      plotMount.appendChild(plot);
+    }
+    currentPlot = plot;
+
+    if (liveRegion) {
+      liveRegion.textContent = `Sequence ${sequenceSelect.value}; subsequence ${subseqSelect.value}; selected ${selected.length} of ${sequenceData.length} terms` +
+        (limitEstimate != null ? `; subsequence limit ≈ ${limitEstimate.toFixed(3)}` : '');
+    }
+  }
+
+  const onSequence = (event) => {
+    state.sequenceId = event.target.value;
+    render();
+  };
+
+  const onSubsequence = (event) => {
+    state.subsequenceId = event.target.value;
+    render();
+  };
+
+  const onNMax = () => {
+    state.nMax = clampInt(nMaxInput.value, 30, 200);
+    render();
+  };
+
+  sequenceSelect.addEventListener('change', onSequence);
+  subseqSelect.addEventListener('change', onSubsequence);
+  nMaxInput.addEventListener('input', onNMax);
+
+  let resizeObserver = null;
+  if (typeof ResizeObserver !== 'undefined' && plotMount) {
+    resizeObserver = new ResizeObserver(() => render());
+    resizeObserver.observe(plotMount);
+  }
+
+  render();
+
+  return {
+    destroy() {
+      try {
+        sequenceSelect.removeEventListener('change', onSequence);
+        subseqSelect.removeEventListener('change', onSubsequence);
+        nMaxInput.removeEventListener('input', onNMax);
+        resizeObserver?.disconnect();
+      } catch (_) {}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch2_bolzano_subsequence'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch2_bolzano_subsequence');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch2_bolzano_subsequence', e);
+    }
+  })();
+
+  // ch2_completeness_gap.js
+  (function(){
+    // Chapter 2: Completeness Gap Explorer
+// Visual goal: show rationals approaching sqrt(2) from below and illustrate missing supremum in Q.
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) {
+    return { destroy() {} };
+  }
+
+  const defaults = {
+    maxDenominator: 12,
+    showUpperBounds: true
+  };
+  const state = {
+    maxDenominator: clampInt(options.maxDenominator ?? defaults.maxDenominator, 2, 60),
+    showUpperBounds: options.showUpperBounds ?? defaults.showUpperBounds
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:center; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:260px;">
+          <span style="min-width:10ch; text-align:right; color: var(--text-secondary);">Max denominator</span>
+          <input type="range" min="2" max="60" step="1" value="${state.maxDenominator}" data-role="den" aria-label="Maximum denominator for rationals" />
+          <span data-role="den-val" style="min-width:4ch; text-align:right; color: var(--text-secondary);"></span>
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:0.4rem; color: var(--text-secondary);">
+          <input type="checkbox" data-role="bounds" ${state.showUpperBounds ? 'checked' : ''} aria-label="Show candidate upper bounds" />
+          <span>Show candidate upper bounds</span>
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvas" data-role="plot" style="margin-top:0.75rem;"></div>
+      <div class="anim__caption" style="margin-top:0.35rem; color: var(--text-secondary);">
+        Rational approximations to $\sqrt{2}$ from below form an increasing bounded set. Completeness of $\mathbb{R}$ guarantees the supremum $\sqrt{2}$ exists.
+      </div>
+    </div>
+  `;
+
+  const plotMount = containerEl.querySelector('[data-role=plot]');
+  const denInput = containerEl.querySelector('[data-role=den]');
+  const denVal = containerEl.querySelector('[data-role=den-val]');
+  const boundsInput = containerEl.querySelector('[data-role=bounds]');
+  const liveRegion = containerEl.querySelector('[data-role=live]');
+
+  const Plot = (typeof window !== 'undefined' && window.Plot) ? window.Plot : null;
+  if (!Plot) {
+    if (plotMount) {
+      plotMount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded. Include Observable Plot (plot.js) to render this animation.</div>';
+    }
+    return { destroy() { containerEl.innerHTML = ''; } };
+  }
+
+  let currentPlot = null;
+
+  function computeRationals(maxDen) {
+    const SQRT2 = Math.SQRT2;
+    const seen = new Set();
+    const vals = [];
+    for (let q = 1; q <= maxDen; q += 1) {
+      const maxNum = Math.floor(SQRT2 * q - Number.EPSILON);
+      for (let p = Math.max(1, maxNum - 3); p <= maxNum; p += 1) {
+        if ((p * p) < 2 * q * q) {
+          const value = p / q;
+          const key = `${p}/${q}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            vals.push({ value, label: key, numerator: p, denominator: q });
+          }
+        }
+      }
+    }
+    vals.sort((a, b) => a.value - b.value);
+    return vals;
+  }
+
+  function computeUpperBounds(rationals) {
+    if (!state.showUpperBounds || rationals.length === 0) return [];
+    const SQRT2 = Math.SQRT2;
+    const candidates = [];
+    const last = rationals[rationals.length - 1];
+    const gap = Math.max(0, SQRT2 - last.value);
+    candidates.push({ label: '√2 ≈ 1.4142', value: SQRT2, style: '#6f42c1' });
+    candidates.push({ label: `${last.label} + gap`, value: SQRT2 - gap / 2, style: '#f59f00' });
+    return candidates;
+  }
+
+  function announce(msg) {
+    if (liveRegion) liveRegion.textContent = msg;
+  }
+
+  function render() {
+    const rationals = computeRationals(state.maxDenominator);
+    const upperBounds = computeUpperBounds(rationals);
+    const domainMin = 1.3;
+    const domainMax = 1.45;
+
+    const width = Math.min(720, Math.max(480, (plotMount?.clientWidth || 560)));
+    const height = Math.round(width * 0.42);
+
+    const marks = [
+      Plot.ruleX([Math.SQRT2], { stroke: '#ef476f', strokeWidth: 2, opacity: 0.85 }),
+      Plot.text([{ value: Math.SQRT2, label: '√2' }], { x: 'value', y: () => 0.9, text: 'label', dy: -8, fill: '#ef476f', fontSize: 12, textAnchor: 'start' }),
+      Plot.dot(rationals, { x: 'value', y: () => 0.5, r: 5, fill: '#0b7285', stroke: 'white', strokeWidth: 1.4, title: d => `${d.label} = ${d.value.toFixed(5)}` }),
+      Plot.text(rationals.slice(-3), { x: 'value', y: () => 0.62, text: d => d.label, fill: 'var(--text-secondary)', fontSize: 11, textAnchor: 'middle' })
+    ];
+
+    if (upperBounds.length > 0) {
+      marks.push(Plot.dot(upperBounds, { x: 'value', y: () => 0.2, r: 5, fill: d => d.style, stroke: 'white', strokeWidth: 1.4, title: d => d.label }));
+      marks.push(Plot.text(upperBounds, { x: 'value', y: () => 0.08, text: d => d.label, fill: d => d.style, fontSize: 11, textAnchor: 'middle' }));
+    }
+
+    const plot = Plot.plot({
+      width,
+      height,
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      x: {
+        domain: [domainMin, domainMax],
+        grid: true,
+        label: 'value'
+      },
+      y: {
+        axis: null,
+        domain: [0, 1],
+        inset: 10
+      },
+      marks
+    });
+
+    if (currentPlot) {
+      try { currentPlot.remove(); } catch (_) {}
+    }
+    if (plotMount) {
+      plotMount.innerHTML = '';
+      plotMount.appendChild(plot);
+    }
+    currentPlot = plot;
+
+    const last = rationals[rationals.length - 1];
+    announce(`Displaying ${rationals.length} rationals with denominators ≤ ${state.maxDenominator}. Best: ${last ? `${last.label} ≈ ${last.value.toFixed(5)}` : 'n/a'}`);
+    if (denVal) denVal.textContent = String(state.maxDenominator);
+  }
+
+  function clampInt(v, min, max) {
+    const n = Math.round(Number(v));
+    return Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
+  }
+
+  const onDenChange = () => {
+    state.maxDenominator = clampInt(denInput.value, 2, 60);
+    render();
+  };
+  const onBoundsChange = () => {
+    state.showUpperBounds = !!boundsInput.checked;
+    render();
+  };
+
+  denInput.addEventListener('input', onDenChange);
+  boundsInput.addEventListener('change', onBoundsChange);
+
+  let resizeObserver = null;
+  if (typeof ResizeObserver !== 'undefined' && plotMount) {
+    resizeObserver = new ResizeObserver(() => render());
+    resizeObserver.observe(plotMount);
+  }
+
+  render();
+
+  return {
+    destroy() {
+      try {
+        denInput.removeEventListener('input', onDenChange);
+        boundsInput.removeEventListener('change', onBoundsChange);
+        resizeObserver?.disconnect();
+      } catch (_) {}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch2_completeness_gap'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch2_completeness_gap');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch2_completeness_gap', e);
+    }
+  })();
+
+  // ch2_epsilon_band.js
+  (function(){
+    // Chapter 2: ε–N Convergence Sandbox
+// Public API: init(containerEl, options) -> { destroy }
+// Visual goal: illustrate ε–N definition with adjustable parameters and sequences.
+
+function init(containerEl, options = {}) {
+  if (!containerEl) {
+    return { destroy() {} };
+  }
+
+  const defaults = {
+    epsilon: 0.2,
+    sequenceType: 'oneOverN',
+    L: 0,
+    C: 1,
+    p: 1,
+    nMax: 60
+  };
+
+  const state = {
+    epsilon: clampNumber(options.epsilon ?? defaults.epsilon, 0.01, 5),
+    sequenceType: options.sequenceType || defaults.sequenceType,
+    L: clampNumber(options.L ?? defaults.L, -200, 200),
+    C: clampNumber(options.C ?? defaults.C, 0.01, 500),
+    p: clampNumber(options.p ?? defaults.p, 0.2, 3),
+    nMax: clampInt(options.nMax ?? defaults.nMax, 20, 200),
+    showBeyondNOnly: false,
+    playing: false,
+    currentN: 1,
+    speed: 1
+  };
+
+  let playTimer = null;
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:center; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <label style="display:flex; align-items:center; gap:0.4rem; min-width:230px;">
+          <span style="min-width:9ch; text-align:right; color: var(--text-secondary);">ε</span>
+          <input type="range" min="0.05" max="2.5" step="0.05" value="${state.epsilon}" data-role="epsilon" aria-label="Epsilon" />
+          <span data-role="epsilon-val" style="min-width:5ch; text-align:right; color: var(--text-secondary);"></span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.4rem; min-width:240px;">
+          <span style="min-width:9ch; text-align:right; color: var(--text-secondary);">Sequence</span>
+          <select data-role="sequence" aria-label="Choose sequence" style="flex:1;">
+            <option value="oneOverN">1/n → 0</option>
+            <option value="steady">100 + 50/n → 100</option>
+            <option value="custom">L + C/nᵖ</option>
+          </select>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.3rem; min-width:160px;">
+          <span style="min-width:2ch; text-align:right; color: var(--text-secondary);">L</span>
+          <input type="number" step="0.5" data-role="L" value="${state.L}" aria-label="Limit L" style="width:6rem;" />
+        </label>
+        <label style="display:flex; align-items:center; gap:0.3rem; min-width:160px;">
+          <span style="min-width:2ch; text-align:right; color: var (--text-secondary);">C</span>
+          <input type="number" step="0.5" data-role="C" value="${state.C}" aria-label="Constant C" style="width:6rem;" />
+        </label>
+        <label style="display:flex; align-items:center; gap:0.3rem; min-width:160px;">
+          <span style="min-width:2ch; text-align:right; color: var(--text-secondary);">p</span>
+          <input type="number" step="0.1" data-role="p" value="${state.p}" aria-label="Exponent p" style="width:5rem;" />
+        </label>
+        <label style="display:flex; align-items:center; gap:0.3rem; min-width:200px;">
+          <span style="min-width:5ch; text-align:right; color: var(--text-secondary);">nₘₐₓ</span>
+          <input type="range" min="20" max="200" step="10" value="${state.nMax}" data-role="nmax" aria-label="Maximum n" />
+        </label>
+        <div style="display:inline-flex; align-items:center; gap:0.5rem;">
+          <button type="button" data-role="play" class="anim__btn">▶︎</button>
+          <label style="display:flex; align-items:center; gap:0.3rem; color: var(--text-secondary);">
+            <span>Speed</span>
+            <input type="range" min="0.25" max="3" step="0.25" value="${state.speed}" data-role="speed" aria-label="Playback speed" />
+          </label>
+        </div>
+        <label style="display:inline-flex; align-items:center; gap:0.4rem; color: var(--text-secondary);">
+          <input type="checkbox" data-role="beyond" aria-label="Show only n > N" />
+          <span>Show only n > N</span>
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="flex:1 1 220px; color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvas" data-role="plot" style="margin-top:0.75rem;"></div>
+      <div class="anim__caption" style="margin-top:0.35rem; color: var(--text-secondary);">
+        Drag ε to tighten the band. Choose a sequence to see how N = ceil(C / ε) shifts and which terms eventually stay within the band.
+      </div>
+    </div>
+  `;
+
+  const plotMount = containerEl.querySelector('[data-role=plot]');
+  const epsilonInput = containerEl.querySelector('[data-role=epsilon]');
+  const epsilonVal = containerEl.querySelector('[data-role=epsilon-val]');
+  const sequenceSelect = containerEl.querySelector('[data-role=sequence]');
+  const LInput = containerEl.querySelector('[data-role=L]');
+  const CInput = containerEl.querySelector('[data-role=C]');
+  const pInput = containerEl.querySelector('[data-role=p]');
+  const nMaxInput = containerEl.querySelector('[data-role=nmax]');
+  const playBtn = containerEl.querySelector('[data-role=play]');
+  const speedInput = containerEl.querySelector('[data-role=speed]');
+  const beyondInput = containerEl.querySelector('[data-role=beyond]');
+  const liveRegion = containerEl.querySelector('[data-role=live]');
+
+  const Plot = (typeof window !== 'undefined' && window.Plot) ? window.Plot : null;
+  if (!Plot) {
+    if (plotMount) {
+      plotMount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded. Include Observable Plot to render this animation.</div>';
+    }
+    return { destroy() { containerEl.innerHTML = ''; } };
+  }
+
+  function clampNumber(value, min, max) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return min;
+    return Math.min(max, Math.max(min, num));
+  }
+
+  function clampInt(value, min, max) {
+    return Math.round(clampNumber(value, min, max));
+  }
+
+  function ensureSequenceParams() {
+    if (state.sequenceType === 'oneOverN') {
+      state.L = 0;
+      state.C = 1;
+      state.p = 1;
+    } else if (state.sequenceType === 'steady') {
+      state.L = 100;
+      state.C = 50;
+      state.p = 1;
+    }
+    if (state.sequenceType !== 'custom') {
+      LInput?.setAttribute('disabled', 'true');
+      CInput?.setAttribute('disabled', 'true');
+      pInput?.setAttribute('disabled', 'true');
+    } else {
+      LInput?.removeAttribute('disabled');
+      CInput?.removeAttribute('disabled');
+      pInput?.removeAttribute('disabled');
+    }
+    LInput.value = state.L;
+    CInput.value = state.C;
+    pInput.value = state.p;
+  }
+
+  function computeSequence() {
+    const items = [];
+    for (let n = 1; n <= state.nMax; n += 1) {
+      const value = state.L + state.C / Math.pow(n, state.p);
+      items.push({ n, value });
+    }
+    return items;
+  }
+
+  function computeN() {
+    if (state.C <= 0 || state.epsilon <= 0) return Infinity;
+    return Math.ceil(state.C / Math.pow(state.epsilon, 1 / state.p));
+  }
+
+  let currentPlot = null;
+
+  function render() {
+    const seq = computeSequence();
+    const N = computeN();
+    state.currentN = Math.min(state.currentN, state.nMax);
+
+    const filteredSeq = state.showBeyondNOnly ? seq.filter(({ n }) => n > N) : seq;
+
+    const width = Math.min(760, Math.max(520, (plotMount?.clientWidth || 560)));
+    const height = Math.round(width * 0.55);
+
+    const bandTop = state.L + state.epsilon;
+    const bandBottom = state.L - state.epsilon;
+
+    const marks = [
+      Plot.areaY([
+        { n: 1, top: bandTop, bottom: bandBottom },
+        { n: state.nMax, top: bandTop, bottom: bandBottom }
+      ], {
+        x: 'n',
+        y: 'top',
+        y1: 'bottom',
+        fill: 'rgba(111, 66, 193, 0.15)',
+        stroke: 'rgba(111, 66, 193, 0.5)',
+        strokeWidth: 1.2
+      }),
+      Plot.ruleY([state.L], { stroke: '#6f42c1', strokeWidth: 2 }),
+      Plot.lineY(seq, { x: 'n', y: 'value', stroke: '#0b7285', strokeWidth: 2, opacity: 0.65 })
+    ];
+
+    const inside = filteredSeq.filter(({ value, n }) => Math.abs(value - state.L) < state.epsilon && n > N);
+    const outside = filteredSeq.filter(({ value }) => Math.abs(value - state.L) >= state.epsilon);
+
+    marks.push(Plot.dot(outside, { x: 'n', y: 'value', r: 4, fill: '#ef476f', stroke: 'white', strokeWidth: 1.4 }));
+    marks.push(Plot.dot(inside, { x: 'n', y: 'value', r: 4, fill: '#2b8a3e', stroke: 'white', strokeWidth: 1.4 }));
+
+    const currentPoint = seq.find(({ n }) => n === state.currentN);
+    if (currentPoint) {
+      marks.push(Plot.dot([currentPoint], { x: 'n', y: 'value', r: 6, fill: '#1f2937', stroke: 'white', strokeWidth: 2 }));
+      marks.push(Plot.text([{ n: currentPoint.n, label: `n=${currentPoint.n}` }], { x: 'n', y: () => bandTop + 0.2, text: 'label', fill: '#1f2937', fontSize: 11, textAnchor: 'middle' }));
+    }
+
+    if (Number.isFinite(N)) {
+      marks.push(Plot.ruleX([N], { stroke: '#f59f00', strokeDasharray: '4 3', strokeWidth: 1.6 }));
+      marks.push(Plot.text([{ n: N, label: `N = ${N}` }], { x: 'n', y: () => bandBottom - 0.3, text: 'label', fill: '#f59f00', fontSize: 11, textAnchor: 'middle' }));
+    }
+
+    const plot = Plot.plot({
+      width,
+      height,
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      x: { domain: [1, state.nMax], nice: true, label: 'n', grid: true },
+      y: { nice: true, grid: true, label: 'xₙ' },
+      marks
+    });
+
+    if (currentPlot) {
+      try { currentPlot.remove(); } catch (_) {}
+    }
+    if (plotMount) {
+      plotMount.innerHTML = '';
+      plotMount.appendChild(plot);
+    }
+    currentPlot = plot;
+
+    if (epsilonVal) epsilonVal.textContent = state.epsilon.toFixed(2);
+    const insideCount = seq.filter(({ value, n }) => Math.abs(value - state.L) < state.epsilon && n > N).length;
+    liveRegion.textContent = `ε = ${state.epsilon.toFixed(2)} · Limit L = ${state.L.toFixed(2)} · N = ${Number.isFinite(N) ? N : '∞'} · ${insideCount} terms with n > N stay inside the band.`;
+  }
+
+  function stopPlaying() {
+    state.playing = false;
+    playBtn.textContent = '▶︎';
+    if (playTimer) {
+      clearInterval(playTimer);
+      playTimer = null;
+    }
+  }
+
+  function startPlaying() {
+    stopPlaying();
+    state.playing = true;
+    playBtn.textContent = '⏸';
+    const interval = Math.max(80, 320 / state.speed);
+    playTimer = setInterval(() => {
+      state.currentN = state.currentN >= state.nMax ? 1 : state.currentN + 1;
+      render();
+    }, interval);
+  }
+
+  function togglePlay() {
+    if (state.playing) {
+      stopPlaying();
+    } else {
+      startPlaying();
+    }
+  }
+
+  const onEpsilon = () => {
+    state.epsilon = clampNumber(epsilonInput.value, 0.05, 2.5);
+    render();
+  };
+
+  const onSequence = (event) => {
+    state.sequenceType = event.target.value;
+    ensureSequenceParams();
+    render();
+  };
+
+  const onL = () => {
+    state.L = clampNumber(LInput.value, -200, 200);
+    render();
+  };
+
+  const onC = () => {
+    state.C = clampNumber(CInput.value, 0.01, 500);
+    render();
+  };
+
+  const onP = () => {
+    state.p = clampNumber(pInput.value, 0.2, 3);
+    render();
+  };
+
+  const onNMax = () => {
+    state.nMax = clampInt(nMaxInput.value, 20, 200);
+    state.currentN = Math.min(state.currentN, state.nMax);
+    render();
+  };
+
+  const onPlay = () => togglePlay();
+
+  const onSpeed = () => {
+    state.speed = clampNumber(speedInput.value, 0.25, 3);
+    if (state.playing) startPlaying();
+  };
+
+  const onBeyond = (event) => {
+    state.showBeyondNOnly = !!event.target.checked;
+    render();
+  };
+
+  epsilonInput.addEventListener('input', onEpsilon);
+  sequenceSelect.addEventListener('change', onSequence);
+  LInput.addEventListener('change', onL);
+  CInput.addEventListener('change', onC);
+  pInput.addEventListener('change', onP);
+  nMaxInput.addEventListener('input', onNMax);
+  playBtn.addEventListener('click', onPlay);
+  speedInput.addEventListener('input', onSpeed);
+  beyondInput.addEventListener('change', onBeyond);
+
+  let resizeObserver = null;
+  if (typeof ResizeObserver !== 'undefined' && plotMount) {
+    resizeObserver = new ResizeObserver(() => render());
+    resizeObserver.observe(plotMount);
+  }
+
+  ensureSequenceParams();
+  render();
+
+  return {
+    destroy() {
+      stopPlaying();
+      try {
+        epsilonInput.removeEventListener('input', onEpsilon);
+        sequenceSelect.removeEventListener('change', onSequence);
+        LInput.removeEventListener('change', onL);
+        CInput.removeEventListener('change', onC);
+        pInput.removeEventListener('change', onP);
+        nMaxInput.removeEventListener('input', onNMax);
+        playBtn.removeEventListener('click', onPlay);
+        speedInput.removeEventListener('input', onSpeed);
+        beyondInput.removeEventListener('change', onBeyond);
+        resizeObserver?.disconnect();
+      } catch (_) {}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch2_epsilon_band'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch2_epsilon_band');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch2_epsilon_band', e);
+    }
+  })();
+
+  // ch2_function_mapping.js
+  (function(){
+    // Chapter 2: Function Mapping Sandbox
+// Visual goal: explore injectivity/surjectivity for f(x) = x^2 under different domain/codomain choices.
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) {
+    return { destroy() {} };
+  }
+
+  const DOMAIN_CONFIGS = [
+    { id: 'all_reals', label: 'Domain: ℝ', min: -3, max: 3 },
+    { id: 'nonnegative', label: 'Domain: [0, ∞)', min: 0, max: 3 },
+    { id: 'zero_two', label: 'Domain: [0, 2]', min: 0, max: 2 },
+    { id: 'neg_two_two', label: 'Domain: [-2, 2]', min: -2, max: 2 }
+  ];
+
+  const CODOMAIN_CONFIGS = [
+    { id: 'all_reals', label: 'Codomain: ℝ', min: -3, max: 6 },
+    { id: 'nonnegative', label: 'Codomain: [0, ∞)', min: 0, max: 6 }
+  ];
+
+  const state = {
+    domain: options.initialDomain && DOMAIN_CONFIGS.some(d => d.id === options.initialDomain)
+      ? options.initialDomain : 'all_reals',
+    codomain: options.initialCodomain && CODOMAIN_CONFIGS.some(c => c.id === options.initialCodomain)
+      ? options.initialCodomain : 'all_reals',
+    showInverse: !!options.showInverse
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:center; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:240px;">
+          <span style="min-width:11ch; text-align:right; color: var(--text-secondary);">Domain</span>
+          <select data-role="domain" aria-label="Select domain" style="flex:1;">
+            ${DOMAIN_CONFIGS.map(d => `<option value="${d.id}">${d.label}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:240px;">
+          <span style="min-width:11ch; text-align:right; color: var(--text-secondary);">Codomain</span>
+          <select data-role="codomain" aria-label="Select codomain" style="flex:1;">
+            ${CODOMAIN_CONFIGS.map(c => `<option value="${c.id}">${c.label}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:0.4rem; color: var(--text-secondary);">
+          <input type="checkbox" data-role="inverse" ${state.showInverse ? 'checked' : ''} aria-label="Show inverse mapping" />
+          <span>Show inverse overlay</span>
+        </label>
+        <div data-role="badges" style="display:flex; flex-wrap:wrap; gap:0.75rem; color: var(--text-secondary);"></div>
+        <div role="status" aria-live="polite" data-role="live" style="flex:1 1 200px; color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvas" data-role="plot" style="margin-top:0.75rem;"></div>
+      <div class="anim__caption" style="margin-top:0.35rem; color: var(--text-secondary);">
+        Changing domain or codomain affects injectivity and surjectivity for $f(x)=x^2$. Try toggling settings to see when an inverse exists.
+      </div>
+    </div>
+  `;
+
+  const domainSelect = containerEl.querySelector('[data-role=domain]');
+  const codomainSelect = containerEl.querySelector('[data-role=codomain]');
+  const inverseInput = containerEl.querySelector('[data-role=inverse]');
+  const badgesEl = containerEl.querySelector('[data-role=badges]');
+  const liveRegion = containerEl.querySelector('[data-role=live]');
+  const plotMount = containerEl.querySelector('[data-role=plot]');
+
+  if (domainSelect) domainSelect.value = state.domain;
+  if (codomainSelect) codomainSelect.value = state.codomain;
+
+  const Plot = (typeof window !== 'undefined' && window.Plot) ? window.Plot : null;
+  if (!Plot) {
+    if (plotMount) {
+      plotMount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded. Include Observable Plot (plot.js) to render this animation.</div>';
+    }
+    return { destroy() { containerEl.innerHTML = ''; } };
+  }
+
+  function getDomainConfig(id) {
+    return DOMAIN_CONFIGS.find(d => d.id === id) || DOMAIN_CONFIGS[0];
+  }
+
+  function getCodomainConfig(id) {
+    return CODOMAIN_CONFIGS.find(c => c.id === id) || CODOMAIN_CONFIGS[0];
+  }
+
+  function isInjective(domainConfig) {
+    return domainConfig.min >= 0; // f(x)=x^2 is injective only when domain excludes negatives
+  }
+
+  function isSurjective(domainConfig, codomainConfig) {
+    if (codomainConfig.min < 0) return false;
+    // Range over domain is [domainMin^2, domainMax^2]
+    const rangeMin = Math.min(domainConfig.min ** 2, domainConfig.max ** 2);
+    const rangeMax = Math.max(domainConfig.min ** 2, domainConfig.max ** 2);
+    return rangeMin <= codomainConfig.min && rangeMax >= codomainConfig.max;
+  }
+
+  function buildSamples(domainConfig, steps = 160) {
+    const samples = [];
+    for (let i = 0; i <= steps; i += 1) {
+      const x = domainConfig.min + (domainConfig.max - domainConfig.min) * (i / steps);
+      samples.push({ x, y: x * x });
+    }
+    return samples;
+  }
+
+  function detectDuplicates(samples) {
+    const map = new Map();
+    const duplicates = [];
+    samples.forEach(sample => {
+      const key = sample.y.toFixed(4);
+      if (map.has(key)) {
+        duplicates.push(sample, map.get(key));
+      } else {
+        map.set(key, sample);
+      }
+    });
+    return duplicates;
+  }
+
+  function renderBadges(injective, surjective) {
+    if (!badgesEl) return;
+    const items = [
+      { label: 'Injective?', value: injective ? 'Yes' : 'No', style: injective ? '#2b8a3e' : '#c92a2a' },
+      { label: 'Surjective?', value: surjective ? 'Yes' : 'No', style: surjective ? '#2b8a3e' : '#c92a2a' },
+      { label: 'Bijective?', value: injective && surjective ? 'Yes' : 'No', style: (injective && surjective) ? '#2b8a3e' : '#c92a2a' }
+    ];
+    badgesEl.innerHTML = items.map(item => `
+      <span style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.35rem 0.55rem; border-radius:0.5rem; background:rgba(148, 163, 184, 0.16);">
+        <strong style="font-weight:600; color: var(--text-secondary);">${item.label}</strong>
+        <span style="color:${item.style}; font-weight:600;">${item.value}</span>
+      </span>
+    `).join('');
+  }
+
+  let currentPlot = null;
+
+  function render() {
+    const domain = getDomainConfig(state.domain);
+    const codomain = getCodomainConfig(state.codomain);
+    const samples = buildSamples(domain);
+    const duplicates = detectDuplicates(samples);
+    const injective = isInjective(domain);
+    const surjective = isSurjective(domain, codomain);
+
+    const width = Math.min(720, Math.max(480, (plotMount?.clientWidth || 560)));
+    const height = Math.round(width * 0.6);
+
+    const marks = [
+      Plot.areaY(samples, { x: 'x', y: () => codomain.max, y1: () => codomain.min, fill: 'rgba(148,163,184,0.12)', stroke: 'none' }),
+      Plot.line(samples, { x: 'x', y: 'y', stroke: '#0b7285', strokeWidth: 2.2 }),
+      Plot.dot(samples, { x: 'x', y: 'y', r: 3, fill: '#1f2937', stroke: 'white', strokeWidth: 1 })
+    ];
+
+    if (duplicates.length > 0 && !injective) {
+      marks.push(Plot.dot(duplicates, { x: 'x', y: 'y', r: 6, fill: '#f59f00', stroke: 'white', strokeWidth: 1.5 }));
+      marks.push(Plot.text(duplicates.slice(0, 2), { x: 'x', y: 'y', text: d => `(${d.x.toFixed(1)}, ${d.y.toFixed(1)})`, dy: -12, fill: '#f59f00', fontSize: 11 }));
+    }
+
+    if (state.showInverse && injective) {
+      const inverseSamples = samples.map(({ x, y }) => ({ x: y, y: x }));
+      marks.push(Plot.line(inverseSamples, { x: 'x', y: 'y', stroke: '#6f42c1', strokeWidth: 2, strokeDasharray: '4 3' }));
+      marks.push(Plot.text([{ x: codomain.max * 0.8, y: Math.sqrt(codomain.max), label: 'Inverse f⁻¹(y)=√y' }], {
+        x: 'x',
+        y: 'y',
+        text: 'label',
+        fill: '#6f42c1',
+        fontSize: 12,
+        textAnchor: 'start'
+      }));
+    }
+
+    const plot = Plot.plot({
+      width,
+      height,
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      x: {
+        domain: [domain.min - 0.5, domain.max + 0.5],
+        grid: true,
+        label: 'x (input)'
+      },
+      y: {
+        domain: [codomain.min - 0.5, Math.max(codomain.max + 0.5, (domain.max ** 2) + 0.5)],
+        grid: true,
+        label: 'f(x) = x²'
+      },
+      marks
+    });
+
+    if (currentPlot) {
+      try { currentPlot.remove(); } catch (_) {}
+    }
+    if (plotMount) {
+      plotMount.innerHTML = '';
+      plotMount.appendChild(plot);
+    }
+    currentPlot = plot;
+
+    renderBadges(injective, surjective);
+    if (liveRegion) {
+      const summary = [
+        `Domain ${domain.label}`,
+        `Codomain ${codomain.label}`,
+        injective ? 'Injective' : 'Not injective',
+        surjective ? 'Surjective' : 'Not surjective'
+      ].join(' · ');
+      liveRegion.textContent = summary;
+    }
+  }
+
+  const onDomainChange = (event) => {
+    state.domain = event.target.value;
+    render();
+  };
+
+  const onCodomainChange = (event) => {
+    state.codomain = event.target.value;
+    render();
+  };
+
+  const onInverseToggle = (event) => {
+    state.showInverse = !!event.target.checked;
+    render();
+  };
+
+  domainSelect?.addEventListener('change', onDomainChange);
+  codomainSelect?.addEventListener('change', onCodomainChange);
+  inverseInput?.addEventListener('change', onInverseToggle);
+
+  let resizeObserver = null;
+  if (typeof ResizeObserver !== 'undefined' && plotMount) {
+    resizeObserver = new ResizeObserver(() => render());
+    resizeObserver.observe(plotMount);
+  }
+
+  render();
+
+  return {
+    destroy() {
+      try {
+        domainSelect?.removeEventListener('change', onDomainChange);
+        codomainSelect?.removeEventListener('change', onCodomainChange);
+        inverseInput?.removeEventListener('change', onInverseToggle);
+        resizeObserver?.disconnect();
+      } catch (_) {}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch2_function_mapping'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch2_function_mapping');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch2_function_mapping', e);
+    }
+  })();
+
+  // ch2_metric_open_ball.js
+  (function(){
+    // Chapter 2: Metric Open Ball Playground
+// Public API: init(containerEl, options) -> { destroy }
+// Visual goal: illustrate open balls under Euclidean vs Manhattan metrics in ℝ².
+
+function init(containerEl, options = {}) {
+  if (!containerEl) {
+    return { destroy() {} };
+  }
+
+  const defaults = {
+    centerX: 1,
+    centerY: 1,
+    radius: 1.2,
+    metric: 'euclidean'
+  };
+
+  const state = {
+    centerX: clampNumber(options.centerX ?? defaults.centerX, -3, 3),
+    centerY: clampNumber(options.centerY ?? defaults.centerY, -3, 3),
+    radius: clampNumber(options.radius ?? defaults.radius, 0.2, 3),
+    metric: options.metric === 'manhattan' ? 'manhattan' : defaults.metric
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:center; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:210px;">
+          <span style="min-width:8ch; text-align:right; color: var(--text-secondary);">Center x₀</span>
+          <input type="range" min="-3" max="3" step="0.1" value="${state.centerX}" data-role="cx" aria-label="Center x coordinate" />
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:210px;">
+          <span style="min-width:8ch; text-align:right; color: var(--text-secondary);">Center y₀</span>
+          <input type="range" min="-3" max="3" step="0.1" value="${state.centerY}" data-role="cy" aria-label="Center y coordinate" />
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:210px;">
+          <span style="min-width:8ch; text-align:right; color: var(--text-secondary);">Radius r</span>
+          <input type="range" min="0.2" max="3" step="0.1" value="${state.radius}" data-role="r" aria-label="Radius" />
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:0.4rem; color: var(--text-secondary);">
+          <select data-role="metric" aria-label="Choose metric" style="min-width:160px;">
+            <option value="euclidean" ${state.metric === 'euclidean' ? 'selected' : ''}>Euclidean</option>
+            <option value="manhattan" ${state.metric === 'manhattan' ? 'selected' : ''}>Manhattan</option>
+          </select>
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="flex:1 1 200px; color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvas" data-role="plot" style="margin-top:0.75rem;"></div>
+      <div class="anim__caption" style="margin-top:0.35rem; color: var(--text-secondary);">
+        Open ball $B((x₀,y₀), r)$ contains all points with distance less than $r$ from the center. Try Euclidean vs Manhattan metrics.
+      </div>
+    </div>
+  `;
+
+  const plotMount = containerEl.querySelector('[data-role=plot]');
+  const cxInput = containerEl.querySelector('[data-role=cx]');
+  const cyInput = containerEl.querySelector('[data-role=cy]');
+  const rInput = containerEl.querySelector('[data-role=r]');
+  const metricSelect = containerEl.querySelector('[data-role=metric]');
+  const liveRegion = containerEl.querySelector('[data-role=live]');
+
+  const Plot = (typeof window !== 'undefined' && window.Plot) ? window.Plot : null;
+  if (!Plot) {
+    if (plotMount) {
+      plotMount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded. Include Observable Plot to display this animation.</div>';
+    }
+    return { destroy() { containerEl.innerHTML = ''; } };
+  }
+
+  const SAMPLE_POINTS = generateSamplePoints(121);
+  let currentPlot = null;
+
+  function clampNumber(value, min, max) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return min;
+    return Math.min(max, Math.max(min, num));
+  }
+
+  function generateSamplePoints(count) {
+    const points = [];
+    const grid = Math.ceil(Math.sqrt(count));
+    for (let i = 0; i < grid; i += 1) {
+      for (let j = 0; j < grid; j += 1) {
+        points.push({
+          x: -3 + (6 * i) / (grid - 1),
+          y: -3 + (6 * j) / (grid - 1)
+        });
+      }
+    }
+    return points;
+  }
+
+  function distance(point, center, metric) {
+    if (metric === 'manhattan') {
+      return Math.abs(point.x - center.x) + Math.abs(point.y - center.y);
+    }
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+    return Math.hypot(dx, dy);
+  }
+
+  function buildBallOutline(center, radius, metric, steps = 240) {
+    const outline = [];
+    if (metric === 'manhattan') {
+      // Diamond shape: |x - cx| + |y - cy| = r
+      const dirs = [
+        { x: radius, y: 0 },
+        { x: 0, y: radius },
+        { x: -radius, y: 0 },
+        { x: 0, y: -radius }
+      ];
+      for (let i = 0; i < dirs.length; i += 1) {
+        const start = dirs[i];
+        const end = dirs[(i + 1) % dirs.length];
+        for (let t = 0; t <= steps / dirs.length; t += 1) {
+          const alpha = t / (steps / dirs.length);
+          outline.push({
+            x: center.x + start.x + alpha * (end.x - start.x),
+            y: center.y + start.y + alpha * (end.y - start.y)
+          });
+        }
+      }
+    } else {
+      for (let i = 0; i <= steps; i += 1) {
+        const theta = (i / steps) * 2 * Math.PI;
+        outline.push({
+          x: center.x + radius * Math.cos(theta),
+          y: center.y + radius * Math.sin(theta)
+        });
+      }
+    }
+    return outline;
+  }
+
+  function render() {
+    const center = { x: state.centerX, y: state.centerY };
+    const radius = state.radius;
+    const metric = state.metric;
+
+    const classified = SAMPLE_POINTS.map(point => ({
+      ...point,
+      inside: distance(point, center, metric) < radius - 1e-6,
+      dist: distance(point, center, metric)
+    }));
+
+    const outline = buildBallOutline(center, radius, metric);
+
+    const width = Math.min(720, Math.max(480, (plotMount?.clientWidth || 560)));
+    const height = Math.round(width * 0.65);
+
+    const marks = [
+      Plot.rect(classified, {
+        x1: d => d.x - 0.12,
+        x2: d => d.x + 0.12,
+        y1: d => d.y - 0.12,
+        y2: d => d.y + 0.12,
+        fill: d => (d.inside ? 'rgba(43,138,62,0.55)' : 'rgba(229,231,235,0.4)'),
+        stroke: d => (d.inside ? '#2b8a3e' : '#94a3b8'),
+        strokeWidth: 0.8
+      }),
+      Plot.dot([center], { x: 'x', y: 'y', r: 5.5, fill: '#1f2937', stroke: 'white', strokeWidth: 1.5 }),
+      Plot.line(outline, { x: 'x', y: 'y', stroke: '#0b7285', strokeWidth: 2.4, strokeDasharray: metric === 'manhattan' ? '5 4' : null })
+    ];
+
+    const plot = Plot.plot({
+      width,
+      height,
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      grid: true,
+      x: { domain: [-3.2, 3.2], label: 'x' },
+      y: { domain: [-3.2, 3.2], label: 'y' },
+      marks
+    });
+
+    if (currentPlot) {
+      try { currentPlot.remove(); } catch (_) {}
+    }
+    if (plotMount) {
+      plotMount.innerHTML = '';
+      plotMount.appendChild(plot);
+    }
+    currentPlot = plot;
+
+    const insideCount = classified.filter(d => d.inside).length;
+    if (liveRegion) {
+      liveRegion.textContent = `${insideCount} / ${classified.length} sample points lie inside B((x₀,y₀), r) with ${metric} metric.`;
+    }
+  }
+
+  const onCx = () => { state.centerX = clampNumber(cxInput.value, -3, 3); render(); };
+  const onCy = () => { state.centerY = clampNumber(cyInput.value, -3, 3); render(); };
+  const onR = () => { state.radius = clampNumber(rInput.value, 0.2, 3); render(); };
+  const onMetric = () => { state.metric = metricSelect.value === 'manhattan' ? 'manhattan' : 'euclidean'; render(); };
+
+  cxInput.addEventListener('input', onCx);
+  cyInput.addEventListener('input', onCy);
+  rInput.addEventListener('input', onR);
+  metricSelect.addEventListener('change', onMetric);
+
+  let resizeObserver = null;
+  if (typeof ResizeObserver !== 'undefined' && plotMount) {
+    resizeObserver = new ResizeObserver(() => render());
+    resizeObserver.observe(plotMount);
+  }
+
+  render();
+
+  return {
+    destroy() {
+      try {
+        cxInput.removeEventListener('input', onCx);
+        cyInput.removeEventListener('input', onCy);
+        rInput.removeEventListener('input', onR);
+        metricSelect.removeEventListener('change', onMetric);
+        resizeObserver?.disconnect();
+      } catch (_) {}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch2_metric_open_ball'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch2_metric_open_ball');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch2_metric_open_ball', e);
+    }
+  })();
+
+  // ch2_monotone_convergence.js
+  (function(){
+    // Chapter 2: Monotone Convergence Builder
+// Public API: init(containerEl, options) -> { destroy }
+// Visual goal: construct bounded monotone sequences and show convergence to the supremum/infimum.
+
+function init(containerEl, options = {}) {
+  if (!containerEl) {
+    return { destroy() {} };
+  }
+
+  const defaults = {
+    direction: 'increasing',
+    limit: 1,
+    startGap: 2,
+    contraction: 0.7,
+    nMax: 40
+  };
+
+  const state = {
+    direction: options.direction === 'decreasing' ? 'decreasing' : defaults.direction,
+    limit: clampNumber(options.limit ?? defaults.limit, -10, 10),
+    startGap: clampNumber(options.startGap ?? defaults.startGap, 0.1, 10),
+    contraction: clampNumber(options.contraction ?? defaults.contraction, 0.1, 0.95),
+    nMax: clampInt(options.nMax ?? defaults.nMax, 10, 120)
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:center; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:220px;">
+          <span style="min-width:9ch; text-align:right; color: var(--text-secondary);">Direction</span>
+          <select data-role="direction" aria-label="Sequence direction" style="flex:1;">
+            <option value="increasing" ${state.direction === 'increasing' ? 'selected' : ''}>Increasing</option>
+            <option value="decreasing" ${state.direction === 'decreasing' ? 'selected' : ''}>Decreasing</option>
+          </select>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.4rem; min-width:200px;">
+          <span style="min-width:6ch; text-align:right; color: var(--text-secondary);">Limit L</span>
+          <input type="number" step="0.2" value="${state.limit}" data-role="limit" aria-label="Limit L" style="width:6rem;" />
+        </label>
+        <label style="display:flex; align-items:center; gap:0.4rem; min-width:210px;">
+          <span style="min-width:7ch; text-align:right; color: var(--text-secondary);">Start gap</span>
+          <input type="range" min="0.1" max="10" step="0.1" value="${state.startGap}" data-role="gap" aria-label="Starting gap" />
+        </label>
+        <label style="display:flex; align-items:center; gap:0.4rem; min-width:210px;">
+          <span style="min-width:7ch; text-align:right; color: var(--text-secondary);">Contraction</span>
+          <input type="range" min="0.1" max="0.95" step="0.05" value="${state.contraction}" data-role="contraction" aria-label="Contraction factor" />
+        </label>
+        <label style="display:flex; align-items:center; gap:0.4rem; min-width:200px;">
+          <span style="min-width:5ch; text-align:right; color: var(--text-secondary);">nₘₐₓ</span>
+          <input type="range" min="10" max="120" step="10" value="${state.nMax}" data-role="nmax" aria-label="Number of terms" />
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="flex:1 1 220px; color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvas" data-role="plot" style="margin-top:0.75rem;"></div>
+      <div class="anim__caption" style="margin-top:0.35rem; color: var (--text-secondary);">
+        Bound a monotone sequence and watch it converge to its supremum (if increasing) or infimum (if decreasing) by the Monotone Convergence Theorem.
+      </div>
+    </div>
+  `;
+
+  const directionSelect = containerEl.querySelector('[data-role=direction]');
+  const limitInput = containerEl.querySelector('[data-role=limit]');
+  const gapInput = containerEl.querySelector('[data-role=gap]');
+  const contractionInput = containerEl.querySelector('[data-role=contraction]');
+  const nMaxInput = containerEl.querySelector('[data-role=nmax]');
+  const liveRegion = containerEl.querySelector('[data-role=live]');
+  const plotMount = containerEl.querySelector('[data-role=plot]');
+
+  const Plot = (typeof window !== 'undefined' && window.Plot) ? window.Plot : null;
+  if (!Plot) {
+    if (plotMount) {
+      plotMount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded. Include Observable Plot (plot.js) to render this animation.</div>';
+    }
+    return { destroy() { containerEl.innerHTML = ''; } };
+  }
+
+  function clampNumber(value, min, max) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return min;
+    return Math.min(max, Math.max(min, num));
+  }
+
+  function clampInt(value, min, max) {
+    return Math.round(clampNumber(value, min, max));
+  }
+
+  function buildSequence() {
+    const items = [];
+    let term = state.direction === 'increasing'
+      ? state.limit - state.startGap
+      : state.limit + state.startGap;
+
+    for (let n = 1; n <= state.nMax; n += 1) {
+      items.push({ n, value: term });
+      const gap = Math.abs(term - state.limit) * state.contraction;
+      if (state.direction === 'increasing') {
+        term = Math.min(state.limit, term + gap);
+      } else {
+        term = Math.max(state.limit, term - gap);
+      }
+    }
+    return items;
+  }
+
+  let currentPlot = null;
+
+  function render() {
+    const seq = buildSequence();
+    const width = Math.min(760, Math.max(520, (plotMount?.clientWidth || 560)));
+    const height = Math.round(width * 0.55);
+
+    const lowerBound = state.direction === 'increasing'
+      ? Math.min(...seq.map(d => d.value), state.limit)
+      : Math.min(state.limit, ...seq.map(d => d.value));
+    const upperBound = state.direction === 'increasing'
+      ? Math.max(state.limit, ...seq.map(d => d.value))
+      : Math.max(...seq.map(d => d.value), state.limit);
+
+    const marks = [
+      Plot.ruleY([state.limit], { stroke: '#6f42c1', strokeWidth: 2 }),
+      Plot.lineY(seq, { x: 'n', y: 'value', stroke: '#0b7285', strokeWidth: 2, opacity: 0.7 }),
+      Plot.dot(seq, { x: 'n', y: 'value', r: 4, fill: '#1f2937', stroke: 'white', strokeWidth: 1.6 }),
+      Plot.text([{ n: state.nMax * 0.8, label: `L = ${state.limit.toFixed(2)}` }], { x: 'n', y: () => state.limit + 0.15 * Math.sign(state.limit || 1), text: 'label', fill: '#6f42c1', fontSize: 12, textAnchor: 'start' })
+    ];
+
+    const plot = Plot.plot({
+      width,
+      height,
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      x: { domain: [1, state.nMax], nice: true, grid: true, label: 'n' },
+      y: { domain: [lowerBound - 0.5, upperBound + 0.5], nice: true, grid: true, label: 'xₙ' },
+      marks
+    });
+
+    if (currentPlot) {
+      try { currentPlot.remove(); } catch (_) {}
+    }
+    if (plotMount) {
+      plotMount.innerHTML = '';
+      plotMount.appendChild(plot);
+    }
+    currentPlot = plot;
+
+    const monotone = seq.every((point, idx, arr) => {
+      if (idx === 0) return true;
+      return state.direction === 'increasing'
+        ? point.value >= arr[idx - 1].value - 1e-9
+        : point.value <= arr[idx - 1].value + 1e-9;
+    });
+    const boundedAbove = Math.max(...seq.map(d => d.value)) <= upperBound + 1e-6;
+    const boundedBelow = Math.min(...seq.map(d => d.value)) >= lowerBound - 1e-6;
+    const converged = Math.abs(seq[seq.length - 1].value - state.limit) < 1e-3;
+
+    if (liveRegion) {
+      liveRegion.textContent = [
+        `Monotone: ${monotone ? 'Yes' : 'No'}`,
+        `Bounded above: ${boundedAbove ? 'Yes' : 'No'}`,
+        `Bounded below: ${boundedBelow ? 'Yes' : 'No'}`,
+        `Converges to L: ${converged ? 'Yes' : 'Still approaching'}`
+      ].join(' · ');
+    }
+  }
+
+  const onDirection = (event) => {
+    state.direction = event.target.value === 'decreasing' ? 'decreasing' : 'increasing';
+    render();
+  };
+
+  const onLimit = () => {
+    state.limit = clampNumber(limitInput.value, -10, 10);
+    render();
+  };
+
+  const onGap = () => {
+    state.startGap = clampNumber(gapInput.value, 0.1, 10);
+    render();
+  };
+
+  const onContraction = () => {
+    state.contraction = clampNumber(contractionInput.value, 0.1, 0.95);
+    render();
+  };
+
+  const onNMax = () => {
+    state.nMax = clampInt(nMaxInput.value, 10, 120);
+    render();
+  };
+
+  directionSelect.addEventListener('change', onDirection);
+  limitInput.addEventListener('change', onLimit);
+  gapInput.addEventListener('input', onGap);
+  contractionInput.addEventListener('input', onContraction);
+  nMaxInput.addEventListener('input', onNMax);
+
+  let resizeObserver = null;
+  if (typeof ResizeObserver !== 'undefined' && plotMount) {
+    resizeObserver = new ResizeObserver(() => render());
+    resizeObserver.observe(plotMount);
+  }
+
+  render();
+
+  return {
+    destroy() {
+      try {
+        directionSelect.removeEventListener('change', onDirection);
+        limitInput.removeEventListener('change', onLimit);
+        gapInput.removeEventListener('input', onGap);
+        contractionInput.removeEventListener('input', onContraction);
+        nMaxInput.removeEventListener('input', onNMax);
+        resizeObserver?.disconnect();
+      } catch (_) {}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch2_monotone_convergence'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch2_monotone_convergence');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch2_monotone_convergence', e);
+    }
+  })();
+
+  // ch2_sup_inf_explorer.js
+  (function(){
+    // Chapter 2: Supremum & Infimum Explorer
+// Public API: init(containerEl, options) -> { destroy }
+// Visual goal: toggle canonical sets and highlight sup/inf/max/min distinctions.
+
+function init(containerEl, options = {}) {
+  if (!containerEl) {
+    return { destroy() {} };
+  }
+
+  const SETS = [
+    {
+      id: 'open01',
+      label: 'S₁ = (0, 1)',
+      type: 'interval',
+      start: 0,
+      end: 1,
+      inclusiveStart: false,
+      inclusiveEnd: false
+    },
+    {
+      id: 'closed01',
+      label: 'S₂ = [0, 1]',
+      type: 'interval',
+      start: 0,
+      end: 1,
+      inclusiveStart: true,
+      inclusiveEnd: true
+    },
+    {
+      id: 'harmonic',
+      label: 'S₃ = {1/n : n ∈ ℕ}',
+      type: 'discrete',
+      generator: (count = 60) => Array.from({ length: count }, (_, i) => ({
+        value: 1 / (i + 1),
+        label: `1/${i + 1}`
+      })),
+      sup: 1,
+      inf: 0,
+      hasMax: true,
+      max: 1,
+      hasMin: false
+    }
+  ];
+
+  const state = {
+    currentSetId: SETS.some(s => s.id === options.initialSetId) ? options.initialSetId : 'open01'
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; flex-wrap:wrap; align-items:center; gap:1rem; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <label style="display:flex; align-items:center; gap:0.5rem; min-width:260px;">
+          <span style="min-width:10ch; text-align:right; color: var(--text-secondary);">Choose set</span>
+          <select data-role="set" aria-label="Choose example set" style="flex:1;">
+            ${SETS.map(set => `<option value="${set.id}">${set.label}</option>`).join('')}
+          </select>
+        </label>
+        <div data-role="badges" style="display:flex; flex-wrap:wrap; align-items:center; gap:0.75rem; color: var(--text-secondary);"></div>
+        <div role="status" aria-live="polite" data-role="live" style="flex:1 1 200px; color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvas" data-role="plot" style="margin-top:0.75rem;"></div>
+      <div class="anim__caption" style="margin-top:0.35rem; color: var(--text-secondary);">
+        Supremum and infimum describe tight bounds even when maxima or minima fail to exist.
+      </div>
+    </div>
+  `;
+
+  const selector = containerEl.querySelector('[data-role=set]');
+  const badgesEl = containerEl.querySelector('[data-role=badges]');
+  const liveRegion = containerEl.querySelector('[data-role=live]');
+  const plotMount = containerEl.querySelector('[data-role=plot]');
+
+  if (selector) selector.value = state.currentSetId;
+
+  const Plot = (typeof window !== 'undefined' && window.Plot) ? window.Plot : null;
+  if (!Plot) {
+    if (plotMount) {
+      plotMount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded. Include Observable Plot to display this animation.</div>';
+    }
+    return { destroy() { containerEl.innerHTML = ''; } };
+  }
+
+  function describeSet(set) {
+    if (set.type === 'interval') {
+      return {
+        inf: set.start,
+        sup: set.end,
+        hasMin: !!set.inclusiveStart,
+        hasMax: !!set.inclusiveEnd,
+        min: set.inclusiveStart ? set.start : null,
+        max: set.inclusiveEnd ? set.end : null,
+        sample: Array.from({ length: 160 }, (_, i) => ({
+          value: set.start + (set.end - set.start) * (i / 159)
+        }))
+      };
+    }
+
+    if (set.type === 'discrete') {
+      const pts = set.generator(set.sampleCount || 60);
+      const values = pts.map(p => p.value);
+      const tol = 1e-6;
+      const sup = set.sup ?? Math.max(...values);
+      const inf = set.inf ?? Math.min(...values);
+      const hasMax = set.hasMax ?? values.some(v => Math.abs(v - sup) < tol);
+      const hasMin = set.hasMin ?? values.some(v => Math.abs(v - inf) < tol);
+      const max = hasMax ? (set.max ?? sup) : null;
+      const min = hasMin ? (set.min ?? inf) : null;
+      return {
+        inf,
+        sup,
+        hasMin,
+        hasMax,
+        min,
+        max,
+        sample: pts
+      };
+    }
+
+    return null;
+  }
+
+  let currentPlot = null;
+
+  function render() {
+    const set = SETS.find(s => s.id === state.currentSetId) || SETS[0];
+    const desc = describeSet(set);
+    if (!desc) return;
+
+    const width = Math.min(720, Math.max(480, (plotMount?.clientWidth || 560)));
+    const height = Math.round(width * 0.35);
+    const domainMargin = 0.15 * Math.max(1, Math.abs(desc.sup) + Math.abs(desc.inf));
+    const domain = [Math.min(desc.inf, desc.sup) - domainMargin, Math.max(desc.inf, desc.sup) + domainMargin];
+
+    const marks = [];
+
+    if (set.type === 'interval') {
+      marks.push(Plot.lineY(desc.sample, { x: 'value', y: () => 0.5, stroke: '#0b7285', strokeWidth: 5, opacity: 0.35 }));
+      const endpoints = [];
+      if (set.inclusiveStart) {
+        endpoints.push({ value: desc.inf, fill: '#0b7285', closed: true });
+      } else {
+        endpoints.push({ value: desc.inf, fill: '#1f2937', closed: false });
+      }
+      if (set.inclusiveEnd) {
+        endpoints.push({ value: desc.sup, fill: '#0b7285', closed: true });
+      } else {
+        endpoints.push({ value: desc.sup, fill: '#1f2937', closed: false });
+      }
+      endpoints.forEach(pt => {
+        marks.push(Plot.dot([{ value: pt.value }], {
+          x: 'value',
+          y: () => 0.5,
+          r: 6,
+          fill: pt.closed ? pt.fill : 'transparent',
+          stroke: pt.closed ? 'white' : pt.fill,
+          strokeWidth: pt.closed ? 1.4 : 2
+        }));
+      });
+    } else if (set.type === 'discrete') {
+      marks.push(Plot.dot(desc.sample, {
+        x: 'value',
+        y: () => 0.5,
+        r: 5,
+        fill: '#0b7285',
+        stroke: 'white',
+        strokeWidth: 1.4,
+        title: d => `${d.label} = ${d.value.toFixed(4)}`
+      }));
+      marks.push(Plot.text(desc.sample.slice(0, 6), {
+        x: 'value',
+        y: () => 0.63,
+        text: d => d.label,
+        fill: 'var(--text-secondary)',
+        fontSize: 11,
+        textAnchor: 'middle'
+      }));
+    }
+
+    const supMark = { value: desc.sup, label: `sup S = ${desc.sup.toFixed(3)}` };
+    const infMark = { value: desc.inf, label: `inf S = ${desc.inf.toFixed(3)}` };
+
+    marks.push(Plot.ruleX([desc.sup], { stroke: '#e76f51', strokeWidth: 2 }));
+    marks.push(Plot.ruleX([desc.inf], { stroke: '#6f42c1', strokeWidth: 2 }));
+    marks.push(Plot.text([supMark], { x: 'value', y: () => 0.82, text: 'label', fill: '#e76f51', fontSize: 12, textAnchor: 'start', dy: -6 }));
+    marks.push(Plot.text([infMark], { x: 'value', y: () => 0.18, text: 'label', fill: '#6f42c1', fontSize: 12, textAnchor: 'start', dy: -6 }));
+
+    const plot = Plot.plot({
+      width,
+      height,
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      x: { domain, grid: true, label: 'value' },
+      y: { domain: [0, 1], axis: null },
+      marks
+    });
+
+    if (currentPlot) {
+      try { currentPlot.remove(); } catch (_) {}
+    }
+    if (plotMount) {
+      plotMount.innerHTML = '';
+      plotMount.appendChild(plot);
+    }
+    currentPlot = plot;
+
+    renderBadges(desc, set.label);
+    updateLiveRegion(desc, set.label);
+  }
+
+  function renderBadges(desc, title) {
+    if (!badgesEl) return;
+    const items = [
+      { label: 'Set', value: title },
+      { label: 'sup S', value: formatNumber(desc.sup) },
+      { label: 'inf S', value: formatNumber(desc.inf) },
+      { label: 'max S', value: desc.hasMax ? formatNumber(desc.max) : 'not attained' },
+      { label: 'min S', value: desc.hasMin ? formatNumber(desc.min) : 'not attained' }
+    ];
+    badgesEl.innerHTML = items.map(item => `
+      <span style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.35rem 0.55rem; border-radius:0.5rem; background:rgba(148, 163, 184, 0.16);">
+        <strong style="font-weight:600; color: var(--text-secondary);">${item.label}</strong>
+        <span style="color: var(--text-primary);">${item.value}</span>
+      </span>
+    `).join('');
+  }
+
+  function updateLiveRegion(desc, title) {
+    if (!liveRegion) return;
+    const parts = [
+      `${title}`,
+      `sup = ${formatNumber(desc.sup)}`,
+      `inf = ${formatNumber(desc.inf)}`,
+      desc.hasMax ? `max = ${formatNumber(desc.max)}` : 'no maximum',
+      desc.hasMin ? `min = ${formatNumber(desc.min)}` : 'no minimum'
+    ];
+    liveRegion.textContent = parts.join(' · ');
+  }
+
+  function formatNumber(num) {
+    if (num == null || !Number.isFinite(num)) return String(num);
+    return Math.abs(num) < 1e-3 || Math.abs(num) > 1e4 ? num.toExponential(2) : num.toFixed(3);
+  }
+
+  const onSetChange = (event) => {
+    state.currentSetId = event.target.value;
+    render();
+  };
+
+  selector?.addEventListener('change', onSetChange);
+
+  let resizeObserver = null;
+  if (typeof ResizeObserver !== 'undefined' && plotMount) {
+    resizeObserver = new ResizeObserver(() => render());
+    resizeObserver.observe(plotMount);
+  }
+
+  render();
+
+  return {
+    destroy() {
+      try {
+        selector?.removeEventListener('change', onSetChange);
+        resizeObserver?.disconnect();
+      } catch (_) {}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch2_sup_inf_explorer'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch2_sup_inf_explorer');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch2_sup_inf_explorer', e);
+    }
+  })();
+
   // ch6_unconstrained_foc_plot.js
   (function(){
     // Chapter 6: Unconstrained Optimization — FOC Illustration (Observable Plot)
