@@ -18,6 +18,20 @@ class PresentationApp {
         this.unlockedSolutions = {};   // keyed by chapter number (boolean)
         // Track active animation module instances to clean up on slide change
         this.activeAnimInstances = [];
+        
+        // Quiet verbose logs by default; enable with ?debug=1
+        try {
+            const qs = (typeof location !== 'undefined' ? location.search : '') || '';
+            const debugOn = /(?:^|[?&])debug=1(?:&|$)/.test(qs);
+            window.__MATH_DEBUG__ = debugOn;
+            // Do not silence logs in frozen/static builds; only silence in dev without debug
+            if (!debugOn && typeof console !== 'undefined' && !this.frozen) {
+                const noop = function(){};
+                // Keep warnings/errors, silence console.log/info
+                try { console.log = noop; } catch(_) {}
+                try { console.info = noop; } catch(_) {}
+            }
+        } catch(_) {}
 
         this.init();
     }
@@ -1368,12 +1382,20 @@ this.currentChapter = chapterIndex;
         // Bind new global toggles
         const toggleLeft = document.getElementById('toggle-left');
         const toggleRight = document.getElementById('toggle-right');
+        const leftExpandToggle = document.getElementById('left-expand-toggle');
+        const rightExpandToggle = document.getElementById('right-expand-toggle');
         try { console.log('[SIDEBAR] toggle-left present:', !!toggleLeft, 'toggle-right present:', !!toggleRight); } catch(_) {}
         if (toggleLeft) {
             toggleLeft.addEventListener('click', () => this.setLeftCollapsed(!this.leftCollapsed));
         }
         if (toggleRight) {
             toggleRight.addEventListener('click', () => this.setRightCollapsed(!this.rightCollapsed));
+        }
+        if (leftExpandToggle) {
+            leftExpandToggle.addEventListener('click', () => this.setLeftCollapsed(false));
+        }
+        if (rightExpandToggle) {
+            rightExpandToggle.addEventListener('click', () => this.setRightCollapsed(false));
         }
 
         // Example animation button (global)
@@ -1416,6 +1438,12 @@ this.currentChapter = chapterIndex;
         // Default to expanded if unset
         if (leftStr === null) this.leftCollapsed = false;
         if (rightStr === null) this.rightCollapsed = false;
+        // On small screens, prefer right sidebar collapsed by default (no saved preference)
+        try {
+            if (rightStr === null && typeof window !== 'undefined' && window.innerWidth <= 768) {
+                this.rightCollapsed = true;
+            }
+        } catch(_) {}
         try { console.log('[SIDEBAR] applySidebarState -> left:', this.leftCollapsed, 'right:', this.rightCollapsed); } catch(_) {}
         document.body.setAttribute('data-left', this.leftCollapsed ? 'collapsed' : 'expanded');
         document.body.setAttribute('data-right', this.rightCollapsed ? 'collapsed' : 'expanded');
@@ -1490,7 +1518,43 @@ this.currentChapter = chapterIndex;
     }
 
     updateEdgeToggles() {
-        // No edge toggles; nothing to do. Kept for compatibility.
+        try {
+            const leftHeaderToggle = document.getElementById('toggle-left');
+            if (leftHeaderToggle) {
+                const label = this.leftCollapsed ? 'Expand left menu' : 'Collapse left menu';
+                leftHeaderToggle.setAttribute('aria-label', label);
+                leftHeaderToggle.setAttribute('title', label);
+                leftHeaderToggle.setAttribute('aria-expanded', this.leftCollapsed ? 'false' : 'true');
+            }
+
+            const rightHeaderToggle = document.getElementById('toggle-right');
+            if (rightHeaderToggle) {
+                const label = this.rightCollapsed ? 'Expand right menu' : 'Collapse right menu';
+                rightHeaderToggle.setAttribute('aria-label', label);
+                rightHeaderToggle.setAttribute('title', label);
+                rightHeaderToggle.setAttribute('aria-expanded', this.rightCollapsed ? 'false' : 'true');
+            }
+
+            const leftEdgeToggle = document.getElementById('left-expand-toggle');
+            if (leftEdgeToggle) {
+                const show = !!this.leftCollapsed;
+                leftEdgeToggle.classList.toggle('show', show);
+                leftEdgeToggle.setAttribute('aria-hidden', show ? 'false' : 'true');
+                leftEdgeToggle.setAttribute('title', 'Expand left menu');
+                leftEdgeToggle.setAttribute('aria-label', 'Expand left menu');
+                leftEdgeToggle.tabIndex = show ? 0 : -1;
+            }
+
+            const rightEdgeToggle = document.getElementById('right-expand-toggle');
+            if (rightEdgeToggle) {
+                const show = !!this.rightCollapsed;
+                rightEdgeToggle.classList.toggle('show', show);
+                rightEdgeToggle.setAttribute('aria-hidden', show ? 'false' : 'true');
+                rightEdgeToggle.setAttribute('title', 'Expand right menu');
+                rightEdgeToggle.setAttribute('aria-label', 'Expand right menu');
+                rightEdgeToggle.tabIndex = show ? 0 : -1;
+            }
+        } catch(_) {}
     }
 
     setupKeyboardShortcuts() {

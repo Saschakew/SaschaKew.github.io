@@ -80,6 +80,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1rem;
 }
 
 .nav-header h2 {
@@ -207,12 +208,66 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
 }
 
 .toc-header h3 {
     font-size: 1rem;
     font-weight: 600;
     color: var(--text-accent);
+}
+
+/* Integrated sidebar toggle buttons */
+.sidebar-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 0.6rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    transition: background var(--animation-duration) ease, color var(--animation-duration) ease, transform var(--animation-duration) ease;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    position: relative;
+}
+
+.sidebar-toggle-btn::before {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.sidebar-toggle-btn--left::before {
+    content: '\276F'; /* ⟯ point right to collapse */
+}
+
+body[data-left='collapsed'] .sidebar-toggle-btn--left::before {
+    content: '\276E'; /* ⟮ point left to expand */
+}
+
+.sidebar-toggle-btn--right::before {
+    content: '\276E'; /* ⟮ point left to collapse */
+}
+
+body[data-right='collapsed'] .sidebar-toggle-btn--right::before {
+    content: '\276F'; /* ⟯ point right to expand */
+}
+
+.sidebar-toggle-btn:hover,
+.sidebar-toggle-btn:focus-visible {
+    background: var(--text-accent);
+    color: var(--bg-primary);
+    outline: none;
+}
+
+.sidebar-toggle-btn:focus-visible {
+    box-shadow: 0 0 0 3px rgba(96,165,250,0.35);
+}
+
+.sidebar-toggle-btn:active {
+    transform: translateY(1px);
 }
 
 .toc-list {
@@ -850,9 +905,6 @@ body[data-right='collapsed'] .content {
 }
 
 /* Ensure toggles (if any) are hidden; we no longer use edge toggles */
-body #left-expand-toggle,
-body #right-expand-toggle { display: none !important; }
-
 /* Fullscreen Mode */
 .fullscreen .navigation {
     transform: translateX(calc(-1 * var(--nav-width)));
@@ -895,22 +947,6 @@ body #right-expand-toggle { display: none !important; }
 }
 
 /* Side collapse buttons in headers */
-.side-collapse-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    line-height: 1;
-    padding: 0.4rem 0.6rem;
-    border-radius: 0.4rem;
-    cursor: pointer;
-}
-
-.side-collapse-btn:hover {
-    background: var(--text-accent);
-    color: var(--bg-primary);
-}
-
 /* Edge expand toggles (shown when collapsed) */
 .edge-toggle {
     position: fixed;
@@ -963,13 +999,39 @@ body #right-expand-toggle { display: none !important; }
     box-shadow: 0 6px 20px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.03);
 }
 
-/* Clean Sidebar Management - Work with existing CSS */
+/* Mobile overrides (after absolute positioning rules) */
+@media (max-width: 768px) {
+  /* Do not reserve layout space for sidebars on small screens */
+  .content {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
 
-/* Default state: edge toggles hidden */
-.edge-toggle { display: none !important; }
+  .navigation {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    height: 100vh !important;
+    z-index: 220 !important;
+  }
 
-/* When sidebar is collapsed, show corresponding edge toggle */
-#navigation.collapsed ~ #left-expand-toggle { display: flex !important; }
-#chapter-toc.collapsed ~ #right-expand-toggle { display: flex !important; }
+  /* Right TOC becomes an off-canvas overlay that slides over content */
+  .chapter-toc {
+    display: block !important; /* override earlier display:none */
+    position: fixed !important; /* override absolute */
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    width: min(90vw, var(--toc-width));
+    transform: translateX(100%); /* off-canvas by default */
+    box-shadow: -5px 0 20px var(--shadow-color);
+    z-index: 250 !important; /* above content and controls */
+  }
 
-/* Don't override existing collapsed transforms - they work fine */
+  /* When expanded, slide the TOC in without squeezing content */
+  body[data-right='expanded'] #chapter-toc {
+    transform: translateX(0) !important;
+    pointer-events: auto !important;
+  }
+}
