@@ -1205,7 +1205,14 @@ this.currentChapter = chapterIndex;
                         'ch2_metric_open_ball': 'ch2_metric_open_ball',
                         'ch2_epsilon_band': 'ch2_epsilon_band',
                         'ch2_monotone_convergence': 'ch2_monotone_convergence',
-                        'ch2_bolzano_subsequence': 'ch2_bolzano_subsequence'
+                        'ch2_bolzano_subsequence': 'ch2_bolzano_subsequence',
+                        // Chapter 4 aliases
+                        'ch4_eigen_invariance': 'ch4_eigen_invariance_plot',
+                        'ch4_eigen_invariance_plot': 'ch4_eigen_invariance_plot',
+                        'ch4_axb_column_space': 'ch4_axb_column_space',
+                        'ch4_det_area_scaling': 'ch4_det_area_scaling',
+                        'ch4_quadratic_form_classifier': 'ch4_quadratic_form_classifier',
+                        'ch4_stability_dynamics': 'ch4_stability_dynamics'
                     };
                     const key = (window.__ANIMS__[id]) ? id : (alias[id] || null);
                     if (key && window.__ANIMS__[key] && typeof window.__ANIMS__[key].init === 'function') {
@@ -1249,6 +1256,23 @@ this.currentChapter = chapterIndex;
                         // Dynamic import removed for static build
                         break;
                     case 'ch7_kkt_consumer_inequality':
+                        // Dynamic import removed for static build
+                        break;
+                    // Chapter 4 interactive figures
+                    case 'ch4_axb_column_space':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch4_det_area_scaling':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch4_eigen_invariance':
+                    case 'ch4_eigen_invariance_plot':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch4_quadratic_form_classifier':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch4_stability_dynamics':
                         // Dynamic import removed for static build
                         break;
                     default:

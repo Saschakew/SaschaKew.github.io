@@ -1774,6 +1774,1140 @@ function init(containerEl, options = {}) {
     }
   })();
 
+  // ch4_axb_column_space.js
+  (function(){
+    // Chapter 4: Ax = b — Column space geometry explorer
+// Public API: init(containerEl, options) -> { destroy }
+// Uses Observable Plot (global window.Plot)
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  const state = {
+    // Matrix A = [[a, b], [c, d]]
+    a: finiteOr(options.a, 5),
+    b: finiteOr(options.b, -1),
+    c: finiteOr(options.c, -1),
+    d: finiteOr(options.d, 3),
+    // RHS vector b = [b1, b2]
+    b1: finiteOr(options.b1, 12),
+    b2: finiteOr(options.b2, 16),
+    showGrid: true,
+    showParallelogram: true,
+    showColumns: true,
+  };
+
+  function finiteOr(v, fallback) {
+    const x = +v; return Number.isFinite(x) ? x : fallback;
+  }
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          Ax=b explorer: Edit A and move b. The plot shows the column space span(A). Ax=b has a solution iff b lies in span(A). When det(A)≠0 the solution is unique.
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span style="min-width:7ch; text-align:right; color:var(--text-secondary);">A =</span>
+          <div style="display:inline-grid; grid-template-columns: auto auto; gap:0.25rem 0.35rem; align-items:center;">
+            <input data-role="a" type="number" step="0.5" value="${state.a}" style="width:5rem;" aria-label="A[0,0]" title="Matrix entry A[0,0]">
+            <input data-role="b" type="number" step="0.5" value="${state.b}" style="width:5rem;" aria-label="A[0,1]" title="Matrix entry A[0,1]">
+            <input data-role="c" type="number" step="0.5" value="${state.c}" style="width:5rem;" aria-label="A[1,0]" title="Matrix entry A[1,0]">
+            <input data-role="d" type="number" step="0.5" value="${state.d}" style="width:5rem;" aria-label="A[1,1]" title="Matrix entry A[1,1]">
+          </div>
+        </div>
+        <div style="display:flex; gap:0.35rem; align-items:center;">
+          <span style="min-width:6ch; text-align:right; color:var(--text-secondary);">b =</span>
+          <input data-role="b1" type="range" min="-30" max="30" step="1" value="${state.b1}" title="b₁ (horizontal component)" aria-label="b1 slider"/>
+          <input data-role="b2" type="range" min="-30" max="30" step="1" value="${state.b2}" title="b₂ (vertical component)" aria-label="b2 slider"/>
+        </div>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Toggle grid lines">
+          <input data-role="grid" type="checkbox" ${state.showGrid ? 'checked' : ''} aria-label="Toggle grid"/> grid
+        </label>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Show the two columns of A as arrows">
+          <input data-role="cols" type="checkbox" ${state.showColumns ? 'checked' : ''} aria-label="Toggle columns"/> columns
+        </label>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Show the span(A) parallelogram (using unit coefficients)">
+          <input data-role="para" type="checkbox" ${state.showParallelogram ? 'checked' : ''} aria-label="Toggle span(A)"/> span(A)
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div class="anim__canvas" data-role="plot"></div>
+        <div class="anim__legend" style="margin-top:0.35rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#2a9d8f;"></span>col₁(A)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#e9c46a;"></span>col₂(A)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:10px; height:10px; background:#e76f51; border-radius:50%;"></span>b</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:10px; height:10px; background:#6f42c1; border-radius:50%;"></span>Ax (when invertible)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:10px; background:var(--text-secondary); opacity:0.12; outline:1px solid var(--border-color);"></span>span(A) (shaded)</span>
+        </div>
+        <div class="anim__caption" style="margin-top:0.25rem; color: var(--text-secondary);">
+          Use: adjust A or b to see how the column space changes. If det(A)=0, the column space is a line; Ax=b is solvable only when b lies on that line.
+        </div>
+      </div>
+    </div>
+  `;
+
+  const Plot = (window && window.Plot) ? window.Plot : null;
+  const mount = containerEl.querySelector('[data-role=plot]');
+  const live = containerEl.querySelector('[data-role=live]');
+
+  const inputs = {
+    a: containerEl.querySelector('input[data-role=a]'),
+    b: containerEl.querySelector('input[data-role=b]'),
+    c: containerEl.querySelector('input[data-role=c]'),
+    d: containerEl.querySelector('input[data-role=d]'),
+    b1: containerEl.querySelector('input[data-role=b1]'),
+    b2: containerEl.querySelector('input[data-role=b2]'),
+    grid: containerEl.querySelector('input[data-role=grid]'),
+    cols: containerEl.querySelector('input[data-role=cols]'),
+    para: containerEl.querySelector('input[data-role=para]'),
+  };
+
+  function det2(a,b,c,d){ return a*d - b*c; }
+  function inv2(a,b,c,d){ const D = det2(a,b,c,d); return D ? [ d/D, -b/D, -c/D, a/D ] : null; }
+
+  let currentFig = null;
+  function render() {
+    state.a = +inputs.a.value; state.b = +inputs.b.value; state.c = +inputs.c.value; state.d = +inputs.d.value;
+    state.b1 = +inputs.b1.value; state.b2 = +inputs.b2.value;
+    state.showGrid = !!inputs.grid.checked; state.showColumns = !!inputs.cols.checked; state.showParallelogram = !!inputs.para.checked;
+
+    const A = [state.a, state.b, state.c, state.d];
+    const B = [state.b1, state.b2];
+    const D = det2(...A);
+
+    // Columns of A
+    const col1 = { x: A[0], y: A[2] };
+    const col2 = { x: A[1], y: A[3] };
+
+    // Parallelogram corners for span visualization (unit coefficients) — kept for reference
+    const P = [
+      { x: 0, y: 0 },
+      { x: col1.x, y: col1.y },
+      { x: col1.x + col2.x, y: col1.y + col2.y },
+      { x: col2.x, y: col2.y },
+      { x: 0, y: 0 },
+    ];
+
+    // Solve x = A^{-1} b if invertible
+    let x = null;
+    const invA = inv2(...A);
+    if (invA) {
+      x = {
+        x1: invA[0]*B[0] + invA[1]*B[1],
+        x2: invA[2]*B[0] + invA[3]*B[1],
+      };
+    }
+
+    const combo = x ? [{ x: x.x1*col1.x + x.x2*col2.x, y: x.x1*col1.y + x.x2*col2.y }] : [];
+
+    const width = Math.min(760, Math.max(420, (mount?.clientWidth || 560)));
+    const height = Math.round(width * 0.64);
+
+    // pick domains symmetric and adaptive
+    const xs = [0, col1.x, col2.x, col1.x+col2.x, B[0], combo[0]?.x ?? 0];
+    const ys = [0, col1.y, col2.y, col1.y+col2.y, B[1], combo[0]?.y ?? 0];
+    const maxAbs = Math.max(10, ...xs.map(v=>Math.abs(v)), ...ys.map(v=>Math.abs(v)));
+    const dom = [-maxAbs, maxAbs];
+
+    const marks = [];
+    if (state.showGrid) {
+      // light grid via Plot frame grid options
+    }
+    if (state.showParallelogram && (Math.hypot(col1.x, col1.y) + Math.hypot(col2.x, col2.y) > 0)) {
+      // Extend span(A) visualization over the entire figure with gradient + grid
+      if (Math.abs(D) > 1e-9) {
+        // rank 2: span(A) = R^2 → gradient shading (strong in unit parallelogram, fading outward)
+        // Draw grid lines along integer multiples of col1 and col2
+        const gridRange = 8; // how many grid lines in each direction
+        for (let i = -gridRange; i <= gridRange; i++) {
+          if (i === 0) continue; // skip origin lines (drawn separately as columns)
+          // Lines parallel to col1 (multiples of col2)
+          const p1 = { x: i * col2.x - gridRange * col1.x, y: i * col2.y - gridRange * col1.y };
+          const p2 = { x: i * col2.x + gridRange * col1.x, y: i * col2.y + gridRange * col1.y };
+          marks.push(Plot.line([p1, p2], { 
+            x: 'x', y: 'y', 
+            stroke: 'var(--text-secondary)', 
+            strokeWidth: 0.5, 
+            opacity: Math.abs(i) <= 1 ? 0.15 : 0.05 
+          }));
+          // Lines parallel to col2 (multiples of col1)
+          const q1 = { x: i * col1.x - gridRange * col2.x, y: i * col1.y - gridRange * col2.y };
+          const q2 = { x: i * col1.x + gridRange * col2.x, y: i * col1.y + gridRange * col2.y };
+          marks.push(Plot.line([q1, q2], { 
+            x: 'x', y: 'y', 
+            stroke: 'var(--text-secondary)', 
+            strokeWidth: 0.5, 
+            opacity: Math.abs(i) <= 1 ? 0.15 : 0.05 
+          }));
+        }
+        
+        // Gradient shading: multiple concentric parallelograms with decreasing opacity
+        const layers = [
+          { scale: 1, opacity: 0.12 },   // unit parallelogram (strongest)
+          { scale: 2, opacity: 0.08 },
+          { scale: 3, opacity: 0.05 },
+          { scale: 5, opacity: 0.03 },
+          { scale: 8, opacity: 0.015 },
+        ];
+        layers.forEach(({ scale, opacity }) => {
+          const poly = [
+            { x: 0, y: 0 },
+            { x: scale * col1.x, y: scale * col1.y },
+            { x: scale * (col1.x + col2.x), y: scale * (col1.y + col2.y) },
+            { x: scale * col2.x, y: scale * col2.y },
+            { x: 0, y: 0 },
+          ];
+          marks.push(Plot.line(poly, { x: 'x', y: 'y', stroke: 'var(--border-color)', opacity: opacity * 0.5, strokeWidth: 1 }));
+          marks.push(Plot.areaY(poly, { x: 'x', y: 'y', fill: 'var(--text-secondary)', opacity }));
+        });
+      } else {
+        // rank 1: span(A) is a line through the origin along a nonzero column
+        const nz1 = Math.hypot(col1.x, col1.y) > 1e-9;
+        const nz2 = Math.hypot(col2.x, col2.y) > 1e-9;
+        if (nz1 || nz2) {
+          const v = nz1 ? col1 : col2;
+          if (Math.abs(v.x) > 1e-9) {
+            const m = v.y / v.x;
+            const pts = [
+              { x: dom[0], y: m * dom[0] },
+              { x: dom[1], y: m * dom[1] },
+            ];
+            marks.push(Plot.line(pts, { x: 'x', y: 'y', stroke: 'var(--text-secondary)', strokeWidth: 4, opacity: 0.25 }));
+          } else {
+            // Vertical span (x = 0)
+            marks.push(Plot.ruleX([0], { stroke: 'var(--text-secondary)', strokeWidth: 4, opacity: 0.25 }));
+          }
+        }
+        // If both columns are zero, span(A) = {0}; omit shading
+      }
+    }
+    if (state.showColumns) {
+      marks.push(Plot.line([{x:0,y:0}, col1], { x:'x', y:'y', stroke:'#2a9d8f', strokeWidth:2 }));
+      marks.push(Plot.line([{x:0,y:0}, col2], { x:'x', y:'y', stroke:'#e9c46a', strokeWidth:2 }));
+    }
+    // Target b
+    marks.push(Plot.dot([{ x: B[0], y: B[1] }], { x:'x', y:'y', r:5, fill:'#e76f51', stroke:'white', strokeWidth:1.5 }));
+
+    // If invertible, show Ax reconstructed and solution coordinates
+    if (x) {
+      marks.push(Plot.dot(combo, { x:'x', y:'y', r:5, fill:'#6f42c1', stroke:'white', strokeWidth:1.5 }));
+      marks.push(Plot.text([
+        { x: (combo[0].x), y: (combo[0].y), label: `x = [${x.x1.toFixed(2)}, ${x.x2.toFixed(2)}]` }
+      ], { x:'x', y:'y', text:'label', dy: -10, fill: 'var(--text-secondary)', fontSize: 12 }));
+    } else {
+      marks.push(Plot.text([{ x: 0, y: 0, label: 'A not invertible (det=0): solution exists only if b ∈ span(A).' }], { x:'x', y:'y', text:'label', dy: -8, fill: 'var(--text-secondary)' }));
+    }
+
+    const fig = Plot.plot({
+      width, height,
+      marginLeft: 46, marginBottom: 44,
+      x: { domain: dom, grid: state.showGrid },
+      y: { domain: dom, grid: state.showGrid },
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      marks
+    });
+
+    if (currentFig) { try { currentFig.remove(); } catch(_){} }
+    if (mount) {
+      mount.innerHTML = '';
+      mount.appendChild(fig);
+      currentFig = fig;
+    }
+
+    if (live) {
+      const detStr = D.toFixed(2);
+      let spanMsg = '';
+      if (!invA) {
+        // Check b ∈ span(A): if both columns are zero, span={0}; otherwise check collinearity with a nonzero column
+        const nz1 = Math.hypot(col1.x, col1.y) > 1e-9;
+        const nz2 = Math.hypot(col2.x, col2.y) > 1e-9;
+        let inSpan = false;
+        if (!nz1 && !nz2) {
+          inSpan = Math.hypot(B[0], B[1]) < 1e-9;
+        } else {
+          const ref = nz1 ? col1 : col2;
+          const area = ref.x * B[1] - ref.y * B[0];
+          inSpan = Math.abs(area) < 1e-6;
+        }
+        spanMsg = inSpan ? 'b ∈ span(A) ⇒ solutions exist (not unique)' : 'b ∉ span(A) ⇒ no solution';
+      }
+      live.textContent = `det(A)=${detStr}; ${invA ? 'invertible ⇒ unique solution' : `singular; ${spanMsg}`}; b=[${B[0].toFixed(1)}, ${B[1].toFixed(1)}]`;
+    }
+  }
+
+  if (!Plot) {
+    if (mount) mount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded.</div>';
+    return { destroy(){ containerEl.innerHTML=''; } };
+  }
+
+  // Wire events
+  Object.values(inputs).forEach(el => el && el.addEventListener('input', render));
+
+  // Initial render
+  render();
+
+  return {
+    destroy() {
+      try { Object.values(inputs).forEach(el => el && el.removeEventListener('input', render)); } catch(_){}
+      if (currentFig) { try { currentFig.remove(); } catch(_){} }
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch4_axb_column_space'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch4_axb_column_space');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch4_axb_column_space', e);
+    }
+  })();
+
+  // ch4_det_area_scaling.js
+  (function(){
+    // Chapter 4: Determinant — Area scaling and invertibility (2D)
+// Public API: init(containerEl, options) -> { destroy }
+// Observable Plot required (window.Plot)
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    a: finiteOr(options.a, 2), b: finiteOr(options.b, 1),
+    c: finiteOr(options.c, 0), d: finiteOr(options.d, 3),
+    showGrid: true,
+    showImages: true,
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          Determinant explorer: Edit A. The image of the unit square under T(x)=Ax is a parallelogram with area |det(A)|. det(A)=0 → area 0 (not invertible).
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span style="min-width:7ch; text-align:right; color:var(--text-secondary);">A =</span>
+          <div style="display:inline-grid; grid-template-columns: auto auto; gap:0.25rem 0.35rem; align-items:center;">
+            <input data-role="a" type="number" step="0.5" value="${state.a}" style="width:5rem;" aria-label="A[0,0]" title="Matrix entry A[0,0]">
+            <input data-role="b" type="number" step="0.5" value="${state.b}" style="width:5rem;" aria-label="A[0,1]" title="Matrix entry A[0,1]">
+            <input data-role="c" type="number" step="0.5" value="${state.c}" style="width:5rem;" aria-label="A[1,0]" title="Matrix entry A[1,0]">
+            <input data-role="d" type="number" step="0.5" value="${state.d}" style="width:5rem;" aria-label="A[1,1]" title="Matrix entry A[1,1]">
+          </div>
+        </div>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Toggle grid lines">
+          <input data-role="grid" type="checkbox" ${state.showGrid ? 'checked' : ''} aria-label="Toggle grid"/> grid
+        </label>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Show transformed images">
+          <input data-role="img" type="checkbox" ${state.showImages ? 'checked' : ''} aria-label="Toggle transformed images"/> images
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div class="anim__canvas" data-role="plot"></div>
+        <div class="anim__legend" style="margin-top:0.35rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#64748b;"></span>axes basis e₁,e₂</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#94a3b8;"></span>unit square (area 1)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#2a9d8f;"></span>Ae₁</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#e9c46a;"></span>Ae₂</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#6f42c1;"></span>image of unit square (area |det(A)|)</span>
+        </div>
+        <div class="anim__caption" style="margin-top:0.25rem; color: var(--text-secondary);">
+          Use: tweak A entries to see how area scales. If det(A)=0, the transformed square collapses to a line/point.
+        </div>
+      </div>
+    </div>
+  `;
+
+  const Plot = (window && window.Plot) ? window.Plot : null;
+  const mount = containerEl.querySelector('[data-role=plot]');
+  const live = containerEl.querySelector('[data-role=live]');
+  const el = {
+    a: containerEl.querySelector('input[data-role=a]'),
+    b: containerEl.querySelector('input[data-role=b]'),
+    c: containerEl.querySelector('input[data-role=c]'),
+    d: containerEl.querySelector('input[data-role=d]'),
+    grid: containerEl.querySelector('input[data-role=grid]'),
+    img: containerEl.querySelector('input[data-role=img]'),
+  };
+
+  function det2(a,b,c,d){ return a*d - b*c; }
+  function applyA(A, p){ return { x: A[0]*p.x + A[1]*p.y, y: A[2]*p.x + A[3]*p.y }; }
+
+  let currentFig = null;
+  function render() {
+    const A = [ +el.a.value, +el.b.value, +el.c.value, +el.d.value ];
+    const D = det2(...A);
+    const showGrid = !!el.grid.checked;
+    const showImages = !!el.img.checked;
+
+    const square = [
+      {x:0,y:0}, {x:1,y:0}, {x:1,y:1}, {x:0,y:1}, {x:0,y:0}
+    ];
+    const img = square.map(p => applyA(A, p));
+
+    const e1 = {x:1,y:0}, e2 = {x:0,y:1};
+    const Ae1 = applyA(A, e1), Ae2 = applyA(A, e2);
+
+    // domain
+    const xs = [...square.map(p=>p.x), ...img.map(p=>p.x), 0, e1.x, e2.x, Ae1.x, Ae2.x];
+    const ys = [...square.map(p=>p.y), ...img.map(p=>p.y), 0, e1.y, e2.y, Ae1.y, Ae2.y];
+    const maxAbs = Math.max(2, ...xs.map(Math.abs), ...ys.map(Math.abs));
+    const dom = [-maxAbs, maxAbs];
+
+    const marks = [];
+    // original axes basis
+    marks.push(Plot.line([{x:0,y:0}, e1], { x:'x', y:'y', stroke:'#64748b', strokeWidth:1.5 }));
+    marks.push(Plot.line([{x:0,y:0}, e2], { x:'x', y:'y', stroke:'#64748b', strokeWidth:1.5 }));
+    // original square
+    marks.push(Plot.line(square, { x:'x', y:'y', stroke:'#94a3b8', strokeWidth:2 }));
+    marks.push(Plot.areaY(square, { x:'x', y:'y', fill:'#94a3b8', opacity:0.1 }));
+
+    if (showImages) {
+      // transformed basis
+      marks.push(Plot.line([{x:0,y:0}, Ae1], { x:'x', y:'y', stroke:'#2a9d8f', strokeWidth:2 }));
+      marks.push(Plot.line([{x:0,y:0}, Ae2], { x:'x', y:'y', stroke:'#e9c46a', strokeWidth:2 }));
+      // transformed square
+      marks.push(Plot.line(img, { x:'x', y:'y', stroke:'#6f42c1', strokeWidth:2.2 }));
+      marks.push(Plot.areaY(img, { x:'x', y:'y', fill:'#6f42c1', opacity:0.12 }));
+      // show |det| label near centroid
+      const cx = img.reduce((s,p)=>s+p.x,0)/img.length;
+      const cy = img.reduce((s,p)=>s+p.y,0)/img.length;
+      marks.push(Plot.text([{ x: cx, y: cy, label: `|det(A)| = ${Math.abs(D).toFixed(2)}` }], { x:'x', y:'y', text:'label', fill:'var(--text-secondary)', dy: -6 }));
+    }
+
+    const width = Math.min(760, Math.max(420, (mount?.clientWidth || 560)));
+    const height = Math.round(width * 0.64);
+    const fig = Plot.plot({
+      width, height,
+      marginLeft: 46, marginBottom: 44,
+      x: { domain: dom, grid: showGrid },
+      y: { domain: dom, grid: showGrid },
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      marks
+    });
+
+    if (currentFig) { try { currentFig.remove(); } catch(_){} }
+    if (mount) {
+      mount.innerHTML = '';
+      mount.appendChild(fig);
+      currentFig = fig;
+    }
+    if (live) {
+      const absD = Math.abs(D);
+      const inv = D===0 ? 'singular' : 'invertible';
+      live.textContent = `det(A) = ${D.toFixed(2)} (${inv}); area scale = |det(A)| ≈ ${absD.toFixed(2)}`;
+    }
+  }
+
+  if (!Plot) {
+    if (mount) mount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded.</div>';
+    return { destroy(){ containerEl.innerHTML=''; } };
+  }
+
+  Object.values(el).forEach(inp => inp && inp.addEventListener('input', render));
+  render();
+
+  return {
+    destroy(){
+      try { Object.values(el).forEach(inp => inp && inp.removeEventListener('input', render)); } catch(_){}
+      if (currentFig) { try { currentFig.remove(); } catch(_){} }
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch4_det_area_scaling'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch4_det_area_scaling');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch4_det_area_scaling', e);
+    }
+  })();
+
+  // ch4_eigen_invariance_plot.js
+  (function(){
+    // Chapter 4: Eigenvector invariance (2D) — grid morph and eigen directions
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    a: finiteOr(options.a, 1.6), b: finiteOr(options.b, 0.8),
+    c: finiteOr(options.c, 0.4), d: finiteOr(options.d, 1.2),
+    t: finiteOr(options.t, 1), // interpolation I→A
+    showGrid: true,
+    showEigen: true,
+    showUnit: true,
+    bounds: 4,
+    step: 1,
+    samples: 40
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          Eigen invariance: Morph the plane from I to A. Real eigenvector directions stay collinear (just scale), while other directions shear/rotate.
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span style="min-width:7ch; text-align:right; color:var(--text-secondary);">A =</span>
+          <div style="display:inline-grid; grid-template-columns: auto auto; gap:0.25rem 0.35rem; align-items:center;">
+            <input data-role="a" type="number" step="0.1" value="${state.a}" style="width:5rem;" aria-label="A[0,0]" title="Matrix entry A[0,0]">
+            <input data-role="b" type="number" step="0.1" value="${state.b}" style="width:5rem;" aria-label="A[0,1]" title="Matrix entry A[0,1]">
+            <input data-role="c" type="number" step="0.1" value="${state.c}" style="width:5rem;" aria-label="A[1,0]" title="Matrix entry A[1,0]">
+            <input data-role="d" type="number" step="0.1" value="${state.d}" style="width:5rem;" aria-label="A[1,1]" title="Matrix entry A[1,1]">
+          </div>
+        </div>
+        <label title="Morph from identity (0) to A (1)" style="display:flex; align-items:center; gap:0.5rem; min-width:260px;">
+          <span style="min-width:6ch; text-align:right; color: var(--text-secondary);">t</span>
+          <input data-role="t" type="range" min="0" max="1" step="0.01" value="${state.t}" aria-label="Morph factor t" />
+        </label>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Toggle grid lines"><input data-role="grid" type="checkbox" ${state.showGrid?'checked':''} aria-label="Toggle grid"/> grid</label>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Toggle displaying eigen directions (if real)"><input data-role="eig" type="checkbox" ${state.showEigen?'checked':''} aria-label="Toggle eigen directions"/> eigen</label>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Show the unit circle and its image"><input data-role="unit" type="checkbox" ${state.showUnit?'checked':''} aria-label="Toggle unit circle"/> unit circle</label>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div class="anim__canvas" data-role="plot"></div>
+        <div class="anim__legend" style="margin-top:0.35rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#475569; opacity:0.6;"></span>grid (morphed)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#94a3b8;"></span>unit circle</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#6f42c1;"></span>image of unit circle</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#22c55e;"></span>eigen directions (if real)</span>
+        </div>
+        <div class="anim__caption" style="margin-top:0.25rem; color: var(--text-secondary);">
+          Use: move t to morph from I to A. If eigenvalues are complex, no real eigen-directions are drawn.
+        </div>
+      </div>
+    </div>
+  `;
+
+  const Plot = (window && window.Plot) ? window.Plot : null;
+  const mount = containerEl.querySelector('[data-role=plot]');
+  const live = containerEl.querySelector('[data-role=live]');
+
+  const el = {
+    a: containerEl.querySelector('input[data-role=a]'),
+    b: containerEl.querySelector('input[data-role=b]'),
+    c: containerEl.querySelector('input[data-role=c]'),
+    d: containerEl.querySelector('input[data-role=d]'),
+    t: containerEl.querySelector('input[data-role=t]'),
+    grid: containerEl.querySelector('input[data-role=grid]'),
+    eig: containerEl.querySelector('input[data-role=eig]'),
+    unit: containerEl.querySelector('input[data-role=unit]'),
+  };
+
+  function apply(A, p) { return { x: A[0]*p.x + A[1]*p.y, y: A[2]*p.x + A[3]*p.y }; }
+  function interp(A, t, p) {
+    // p(t) = (1-t) p + t A p
+    const Ap = apply(A, p);
+    return { x: (1-t)*p.x + t*Ap.x, y: (1-t)*p.y + t*Ap.y };
+  }
+  function eig2(A) {
+    const [a,b,c,d] = A;
+    const tr = a + d;
+    const disc = tr*tr - 4*(a*d - b*c);
+    if (disc < 0) return { real: false, values: [], vecs: [] };
+    const s = Math.sqrt(disc);
+    const l1 = (tr + s)/2, l2 = (tr - s)/2;
+    function eigenvec(l) {
+      // solve (A - lI)v=0 → pick a non-trivial vector
+      const A11=a-l, A12=b, A21=c, A22=d-l;
+      let v = null;
+      if (Math.abs(A12) + Math.abs(A11) > Math.abs(A21) + Math.abs(A22)) {
+        // use row1: A11 v1 + A12 v2 = 0 → choose v1 = 1
+        if (Math.abs(A12) > 1e-9) v = [ -A11/A12, 1 ]; else v = [1, 0];
+      } else {
+        if (Math.abs(A22) > 1e-9) v = [ 1, -A21/A22 ]; else v = [0, 1];
+      }
+      const n = Math.hypot(v[0], v[1]) || 1;
+      return [ v[0]/n, v[1]/n ];
+    }
+    const v1 = eigenvec(l1), v2 = eigenvec(l2);
+    return { real: true, values: [l1, l2], vecs: [v1, v2] };
+  }
+
+  function buildGrid(A, t, bounds, step, samples) {
+    const lines = [];
+    const lo = -bounds, hi = bounds;
+    // vertical lines x = k
+    for (let k = Math.ceil(lo); k <= hi; k += step) {
+      const pts = [];
+      for (let i = 0; i <= samples; i++) {
+        const y = lo + (i*(hi-lo))/samples;
+        pts.push(interp(A, t, { x: k, y }));
+      }
+      lines.push({ pts, kind: 'v' });
+    }
+    // horizontal lines y = k
+    for (let k = Math.ceil(lo); k <= hi; k += step) {
+      const pts = [];
+      for (let i = 0; i <= samples; i++) {
+        const x = lo + (i*(hi-lo))/samples;
+        pts.push(interp(A, t, { x, y: k }));
+      }
+      lines.push({ pts, kind: 'h' });
+    }
+    return lines;
+  }
+
+  function unitCircle(t, steps=240) {
+    const pts = [];
+    for (let i=0;i<=steps;i++) {
+      const ang = (i/steps) * 2*Math.PI;
+      pts.push({ x: Math.cos(ang), y: Math.sin(ang) });
+    }
+    return pts;
+  }
+
+  let currentFig = null;
+  function render() {
+    const A = [ +el.a.value, +el.b.value, +el.c.value, +el.d.value ];
+    const t = +el.t.value;
+    const showGrid = !!el.grid.checked;
+    const showEigen = !!el.eig.checked;
+    const showUnit = !!el.unit.checked;
+
+    const bounds = state.bounds, step = state.step, samples = state.samples;
+
+    const width = Math.min(820, Math.max(420, (mount?.clientWidth || 560)));
+    const height = Math.round(width * 0.64);
+
+    const marks = [];
+
+    // Grid
+    if (showGrid) {
+      const lines = buildGrid(A, t, bounds, step, samples);
+      for (const ln of lines) {
+        marks.push(window.Plot.lineY(ln.pts, { x: 'x', y: 'y', stroke: (ln.kind==='v') ? '#475569' : '#475569', opacity: 0.25, strokeWidth: 1 }));
+      }
+    }
+
+    // Unit circle and its image under interpolation
+    if (showUnit) {
+      const uc = unitCircle();
+      const ucT = uc.map(p => interp(A, t, p));
+      marks.push(window.Plot.lineY(uc, { x: 'x', y: 'y', stroke: '#94a3b8', opacity: 0.6 }));
+      marks.push(window.Plot.lineY(ucT, { x: 'x', y: 'y', stroke: '#6f42c1', strokeWidth: 2.0, opacity: 0.9 }));
+    }
+
+    // Eigen-directions
+    const EI = eig2(A);
+    if (showEigen && EI.real) {
+      const R = bounds * 0.95;
+      const rays = [];
+      for (const v of EI.vecs) {
+        const p1 = { x: 0, y: 0 };
+        const p2 = { x: v[0]*R, y: v[1]*R };
+        marks.push(window.Plot.lineY([p1, p2], { x: 'x', y: 'y', stroke: '#22c55e', strokeWidth: 2.4 }));
+        marks.push(window.Plot.lineY([p1, { x: -p2.x, y: -p2.y }], { x: 'x', y: 'y', stroke: '#22c55e', strokeWidth: 2.4 }));
+      }
+    }
+
+    const fig = window.Plot.plot({
+      width, height,
+      marginLeft: 46, marginBottom: 44,
+      x: { domain: [-bounds, bounds], grid: true },
+      y: { domain: [-bounds, bounds], grid: true },
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      marks
+    });
+
+    if (currentFig) { try { currentFig.remove(); } catch(_){} }
+    if (mount) { mount.innerHTML=''; mount.appendChild(fig); currentFig = fig; }
+
+    if (live) {
+      if (EI.real) {
+        const [l1, l2] = EI.values;
+        live.textContent = `eigs: ${l1.toFixed(2)}, ${l2.toFixed(2)} — real; t=${t.toFixed(2)}`;
+      } else {
+        live.textContent = `complex eigenvalues (rotation-like); t=${t.toFixed(2)}`;
+      }
+    }
+  }
+
+  if (!Plot) {
+    if (mount) mount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded.</div>';
+    return { destroy(){ containerEl.innerHTML=''; } };
+  }
+
+  Object.values(el).forEach(inp => inp && inp.addEventListener('input', render));
+  render();
+
+  return { destroy(){ try { Object.values(el).forEach(inp => inp && inp.removeEventListener('input', render)); } catch(_){} if (currentFig){ try{ currentFig.remove(); }catch(_){}} containerEl.innerHTML=''; } };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch4_eigen_invariance_plot'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch4_eigen_invariance_plot');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch4_eigen_invariance_plot', e);
+    }
+  })();
+
+  // ch4_quadratic_form_classifier.js
+  (function(){
+    // Chapter 4: Quadratic form Q(x)=x^T A x classifier (2x2 symmetric)
+// Public API: init(containerEl, options) -> { destroy }
+// Renders contour sets and eigen-based classification.
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    a: finiteOr(options.a, 1),
+    b: finiteOr(options.b, 0),
+    c: finiteOr(options.c, 1),
+    kBase: finiteOr(options.kBase, 1),
+    showEigen: true,
+    showLabels: true,
+    bounds: finiteOr(options.bounds, 6)
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;"> 
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          Quadratic form Q(x)=xᵀAx: adjust symmetric A and level |k| to see contours Q(x)=±k,±2k,±3k. Classification comes from eigenvalues of A.
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span style="min-width:7ch; text-align:right; color:var(--text-secondary);">A =</span>
+          <div style="display:inline-grid; grid-template-columns: auto auto; gap:0.25rem 0.35rem; align-items:center;">
+            <input data-role="a" type="number" step="0.5" value="${state.a}" style="width:5rem;" title="a (top-left)" aria-label="a (top-left)">
+            <input data-role="b" type="number" step="0.5" value="${state.b}" style="width:5rem;" title="b (off-diagonal)" aria-label="b (off-diagonal)">
+            <input data-role="b" type="number" step="0.5" value="${state.b}" style="width:5rem;" title="b (off-diagonal)" aria-label="b (off-diagonal)">
+            <input data-role="c" type="number" step="0.5" value="${state.c}" style="width:5rem;" title="c (bottom-right)" aria-label="c (bottom-right)">
+          </div>
+        </div>
+        <label title="Base contour level |k|" style="display:flex; align-items:center; gap:0.5rem; min-width:260px;">
+          <span style="min-width:8ch; text-align:right; color: var(--text-secondary);">|k|</span>
+          <input data-role="k" type="range" min="0.2" max="5" step="0.1" value="${state.kBase}" aria-label="Base level |k|" />
+        </label>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Toggle eigen directions"><input data-role="eig" type="checkbox" ${state.showEigen?'checked':''} aria-label="Toggle eigen directions"/> eigen</label>
+        <label style="display:inline-flex; gap:0.35rem; align-items:center;" title="Toggle bottom label"><input data-role="lab" type="checkbox" ${state.showLabels?'checked':''} aria-label="Toggle classification label"/> labels</label>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div class="anim__canvas" data-role="plot"></div>
+        <div class="anim__legend" style="margin-top:0.35rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#0ea5e9;"></span>Q(x)=+levels</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#ef4444;"></span>Q(x)=−levels (if defined)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#22c55e;"></span>eigen dir 1</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#a3e635;"></span>eigen dir 2</span>
+        </div>
+        <div class="anim__caption" style="margin-top:0.25rem; color: var(--text-secondary);">
+          Use: set A and |k|. If both eigenvalues are >0 (PD), only blue ellipses appear; if signs mix (indefinite), both blue/red curves appear; if one eigenvalue is 0, curves degenerate.
+        </div>
+      </div>
+    </div>
+  `;
+
+  const Plot = (window && window.Plot) ? window.Plot : null;
+  const mount = containerEl.querySelector('[data-role=plot]');
+  const live = containerEl.querySelector('[data-role=live]');
+  const el = {
+    a: containerEl.querySelector('input[data-role=a]'),
+    b: containerEl.querySelector('input[data-role=b]'),
+    c: containerEl.querySelector('input[data-role=c]'),
+    k: containerEl.querySelector('input[data-role=k]'),
+    eig: containerEl.querySelector('input[data-role=eig]'),
+    lab: containerEl.querySelector('input[data-role=lab]'),
+  };
+
+  function eig2sym(a,b,c) {
+    // eigenvalues of [[a,b],[b,c]]
+    const tr = a + c;
+    const det = a*c - b*b;
+    const disc = Math.max(0, tr*tr - 4*det);
+    const s = Math.sqrt(disc);
+    const l1 = (tr + s)/2; const l2 = (tr - s)/2;
+    function eigenvec(l) {
+      // Solve (A - lI)v = 0 → [a-l, b; b, c-l]
+      const A11 = a - l, A12 = b, A21 = b, A22 = c - l;
+      let v;
+      if (Math.abs(A12) + Math.abs(A11) > Math.abs(A21) + Math.abs(A22)) {
+        if (Math.abs(A12) > 1e-9) v = [ -A11/A12, 1 ]; else v = [1, 0];
+      } else {
+        if (Math.abs(A22) > 1e-9) v = [ 1, -A21/A22 ]; else v = [0, 1];
+      }
+      const n = Math.hypot(v[0], v[1]) || 1; return [ v[0]/n, v[1]/n ];
+    }
+    return { values:[l1,l2], vecs:[ eigenvec(l1), eigenvec(l2) ], det, tr };
+  }
+
+  function classify(l1,l2) {
+    const eps = 1e-9;
+    const p = (x)=> x>eps, n=(x)=> x<-eps, z=(x)=> Math.abs(x)<=eps;
+    if (p(l1) && p(l2)) return 'Positive definite';
+    if (n(l1) && n(l2)) return 'Negative definite';
+    if ((p(l1)&&z(l2)) || (p(l2)&&z(l1))) return 'Positive semidefinite';
+    if ((n(l1)&&z(l2)) || (n(l2)&&z(l1))) return 'Negative semidefinite';
+    return 'Indefinite';
+  }
+
+  function contourPoints(a,b,c,k,thetaSteps=512, rMax=state.bounds*1.2) {
+    // Param: x = r u where u=(cosθ,sinθ), r^2 u^T A u = k → r = sqrt(k / denom)
+    const pts = [];
+    for (let i=0;i<=thetaSteps;i++) {
+      const th = (i/thetaSteps)*2*Math.PI;
+      const u1 = Math.cos(th), u2 = Math.sin(th);
+      const denom = a*u1*u1 + 2*b*u1*u2 + c*u2*u2;
+      if (Math.abs(denom) < 1e-12) { pts.push(null); continue; }
+      const val = k/denom;
+      if (val <= 0) { pts.push(null); continue; }
+      const r = Math.sqrt(val);
+      if (!Number.isFinite(r) || r>rMax) { pts.push(null); continue; }
+      pts.push({ x: r*u1, y: r*u2 });
+    }
+    // Convert to polylines separated at nulls
+    const lines = [];
+    let cur = [];
+    for (const p of pts) {
+      if (!p) { if (cur.length>1) lines.push(cur); cur=[]; }
+      else { cur.push(p); }
+    }
+    if (cur.length>1) lines.push(cur);
+    return lines;
+  }
+
+  let currentFig = null;
+  function render() {
+    const a = +el.a.value, b = +el.b.value, c = +el.c.value;
+    const kBase = +el.k.value;
+    const showEigen = !!el.eig.checked;
+    const showLabels = !!el.lab.checked;
+
+    const { values:[l1,l2], vecs:[v1,v2], det, tr } = eig2sym(a,b,c);
+    const cls = classify(l1,l2);
+
+    const marks = [];
+
+    // Draw several contour levels when meaningful
+    const levels = [kBase, 2*kBase, 3*kBase];
+    // Positive-level contours
+    for (const k of levels) {
+      const polys = contourPoints(a,b,c,k);
+      polys.forEach(poly => marks.push(window.Plot.lineY(poly, { x:'x', y:'y', stroke:'#0ea5e9', opacity:0.9 })));
+    }
+    // Negative-level contours (for ND or Indef)
+    for (const k of levels) {
+      const polysN = contourPoints(a,b,c,-k);
+      polysN.forEach(poly => marks.push(window.Plot.lineY(poly, { x:'x', y:'y', stroke:'#ef4444', opacity:0.9 })));
+    }
+
+    // Eigenvectors
+    if (showEigen) {
+      const R = state.bounds * 0.95;
+      marks.push(window.Plot.lineY([{x:0,y:0},{x:v1[0]*R,y:v1[1]*R}], { x:'x', y:'y', stroke:'#22c55e', strokeWidth:2.2 }));
+      marks.push(window.Plot.lineY([{x:0,y:0},{x:-v1[0]*R,y:-v1[1]*R}], { x:'x', y:'y', stroke:'#22c55e', strokeWidth:2.2 }));
+      marks.push(window.Plot.lineY([{x:0,y:0},{x:v2[0]*R,y:v2[1]*R}], { x:'x', y:'y', stroke:'#a3e635', strokeWidth:2.2 }));
+      marks.push(window.Plot.lineY([{x:0,y:0},{x:-v2[0]*R,y:-v2[1]*R}], { x:'x', y:'y', stroke:'#a3e635', strokeWidth:2.2 }));
+    }
+
+    // Labels
+    if (showLabels) {
+      marks.push(window.Plot.text([{ x: 0, y: -state.bounds*0.9, label: `${cls} — eigs=(${l1.toFixed(2)}, ${l2.toFixed(2)})` }], { x:'x', y:'y', text:'label', textAnchor:'middle', fill:'var(--text-secondary)' }));
+    }
+
+    const width = Math.min(820, Math.max(420, (mount?.clientWidth || 560)));
+    const height = Math.round(width * 0.64);
+    const fig = window.Plot.plot({
+      width, height,
+      marginLeft: 46, marginBottom: 44,
+      x: { domain: [-state.bounds, state.bounds], grid: true },
+      y: { domain: [-state.bounds, state.bounds], grid: true },
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      marks
+    });
+
+    if (currentFig) { try { currentFig.remove(); } catch(_){} }
+    if (mount) { mount.innerHTML=''; mount.appendChild(fig); currentFig = fig; }
+
+    if (live) {
+      live.textContent = `tr(A)=${tr.toFixed(2)}, det(A)=${det.toFixed(2)}, classification: ${cls}`;
+    }
+  }
+
+  if (!Plot) {
+    if (mount) mount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded.</div>';
+    return { destroy(){ containerEl.innerHTML=''; } };
+  }
+
+  Object.values(el).forEach(inp => inp && inp.addEventListener('input', render));
+  render();
+
+  return { destroy(){ try { Object.values(el).forEach(inp => inp && inp.removeEventListener('input', render)); } catch(_){} if (currentFig){ try{ currentFig.remove(); }catch(_){}} containerEl.innerHTML=''; } };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch4_quadratic_form_classifier'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch4_quadratic_form_classifier');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch4_quadratic_form_classifier', e);
+    }
+  })();
+
+  // ch4_stability_dynamics.js
+  (function(){
+    // Chapter 4: Stability of linear dynamic systems xₜ₊₁ = Axₜ
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    a: finiteOr(options.a, 0.8), b: finiteOr(options.b, 0.3),
+    c: finiteOr(options.c, -0.2), d: finiteOr(options.d, 0.9),
+    x0: finiteOr(options.x0, 1.5), y0: finiteOr(options.y0, 1.0),
+    steps: finiteOr(options.steps, 20),
+    running: false,
+    currentStep: 0,
+    trajectory: []
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          Linear dynamics: xₜ₊₁ = Axₜ. Stability depends on eigenvalues: |λᵢ| < 1 → stable (converges), |λᵢ| > 1 → unstable (explodes).
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span style="min-width:7ch; text-align:right; color:var(--text-secondary);">A =</span>
+          <div style="display:inline-grid; grid-template-columns: auto auto; gap:0.25rem 0.35rem; align-items:center;">
+            <input data-role="a" type="number" step="0.1" value="${state.a}" style="width:5rem;" aria-label="A[0,0]">
+            <input data-role="b" type="number" step="0.1" value="${state.b}" style="width:5rem;" aria-label="A[0,1]">
+            <input data-role="c" type="number" step="0.1" value="${state.c}" style="width:5rem;" aria-label="A[1,0]">
+            <input data-role="d" type="number" step="0.1" value="${state.d}" style="width:5rem;" aria-label="A[1,1]">
+          </div>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span style="min-width:7ch; text-align:right; color:var(--text-secondary);">x₀ =</span>
+          <input data-role="x0" type="number" step="0.1" value="${state.x0}" style="width:5rem;" aria-label="Initial x">
+          <input data-role="y0" type="number" step="0.1" value="${state.y0}" style="width:5rem;" aria-label="Initial y">
+        </div>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="color: var(--text-secondary);">Steps:</span>
+          <input data-role="steps" type="number" min="5" max="100" value="${state.steps}" style="width:5rem;" aria-label="Number of steps">
+        </label>
+        <button data-role="run" style="padding:0.4rem 0.9rem; cursor:pointer;">Run</button>
+        <button data-role="reset" style="padding:0.4rem 0.9rem; cursor:pointer;">Reset</button>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div class="anim__canvas" data-role="plot"></div>
+        <div class="anim__legend" style="margin-top:0.35rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#22c55e;"></span>eigen-directions (if real)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:12px; height:12px; background:#3b82f6; border-radius:50%;"></span>trajectory xₜ</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:12px; height:12px; background:#ef4444; border-radius:50%;"></span>x₀ (initial)</span>
+        </div>
+        <div class="anim__caption" style="margin-top:0.25rem; color: var(--text-secondary);">
+          Click "Run" to iterate xₜ₊₁ = Axₜ. Green lines show eigen-directions; trajectory converges if all |λᵢ| < 1.
+        </div>
+      </div>
+    </div>
+  `;
+
+  const Plot = (window && window.Plot) ? window.Plot : null;
+  const mount = containerEl.querySelector('[data-role=plot]');
+  const live = containerEl.querySelector('[data-role=live]');
+
+  const el = {
+    a: containerEl.querySelector('input[data-role=a]'),
+    b: containerEl.querySelector('input[data-role=b]'),
+    c: containerEl.querySelector('input[data-role=c]'),
+    d: containerEl.querySelector('input[data-role=d]'),
+    x0: containerEl.querySelector('input[data-role=x0]'),
+    y0: containerEl.querySelector('input[data-role=y0]'),
+    steps: containerEl.querySelector('input[data-role=steps]'),
+    run: containerEl.querySelector('button[data-role=run]'),
+    reset: containerEl.querySelector('button[data-role=reset]')
+  };
+
+  function apply(A, p) { return { x: A[0]*p.x + A[1]*p.y, y: A[2]*p.x + A[3]*p.y }; }
+
+  function eig2(A) {
+    const [a,b,c,d] = A;
+    const tr = a + d;
+    const det = a*d - b*c;
+    const disc = tr*tr - 4*det;
+    if (disc < 0) return { real: false, values: [], vecs: [] };
+    const s = Math.sqrt(disc);
+    const l1 = (tr + s)/2, l2 = (tr - s)/2;
+    function eigenvec(l) {
+      const A11=a-l, A12=b, A21=c, A22=d-l;
+      let v = null;
+      if (Math.abs(A12) > 1e-9) {
+        v = [ -A11/A12, 1 ];
+      } else if (Math.abs(A21) > 1e-9) {
+        v = [ 1, -A21/A22 ];
+      } else {
+        v = [1, 0];
+      }
+      const n = Math.hypot(v[0], v[1]) || 1;
+      return [ v[0]/n, v[1]/n ];
+    }
+    const v1 = eigenvec(l1), v2 = eigenvec(l2);
+    return { real: true, values: [l1, l2], vecs: [v1, v2] };
+  }
+
+  function computeTrajectory() {
+    const A = [ +el.a.value, +el.b.value, +el.c.value, +el.d.value ];
+    const x0 = { x: +el.x0.value, y: +el.y0.value };
+    const steps = Math.max(5, Math.min(100, +el.steps.value));
+    
+    const traj = [x0];
+    let current = x0;
+    for (let i = 0; i < steps; i++) {
+      current = apply(A, current);
+      traj.push(current);
+      // Safety: stop if exploding
+      if (Math.abs(current.x) > 1e6 || Math.abs(current.y) > 1e6) break;
+    }
+    return traj;
+  }
+
+  let currentFig = null;
+  function render() {
+    const A = [ +el.a.value, +el.b.value, +el.c.value, +el.d.value ];
+    const traj = state.trajectory.length > 0 ? state.trajectory : [{ x: +el.x0.value, y: +el.y0.value }];
+
+    const width = Math.min(820, Math.max(420, (mount?.clientWidth || 560)));
+    const height = Math.round(width * 0.64);
+
+    // Compute bounds from trajectory
+    let maxR = 3;
+    for (const p of traj) {
+      const r = Math.hypot(p.x, p.y);
+      if (r > maxR && r < 1e5) maxR = r;
+    }
+    const bounds = Math.min(Math.max(3, maxR * 1.2), 50);
+
+    const marks = [];
+
+    // Eigen-directions
+    const EI = eig2(A);
+    if (EI.real) {
+      const R = bounds * 0.95;
+      for (const v of EI.vecs) {
+        const p1 = { x: 0, y: 0 };
+        const p2 = { x: v[0]*R, y: v[1]*R };
+        marks.push(window.Plot.lineY([p1, p2], { x: 'x', y: 'y', stroke: '#22c55e', strokeWidth: 2.0, opacity: 0.7 }));
+        marks.push(window.Plot.lineY([p1, { x: -p2.x, y: -p2.y }], { x: 'x', y: 'y', stroke: '#22c55e', strokeWidth: 2.0, opacity: 0.7 }));
+      }
+    }
+
+    // Trajectory line
+    if (traj.length > 1) {
+      marks.push(window.Plot.lineY(traj, { x: 'x', y: 'y', stroke: '#3b82f6', strokeWidth: 2.0, opacity: 0.8 }));
+    }
+
+    // Trajectory points
+    marks.push(window.Plot.dot(traj, { x: 'x', y: 'y', fill: '#3b82f6', r: 4, opacity: 0.7 }));
+
+    // Initial point (highlight)
+    if (traj.length > 0) {
+      marks.push(window.Plot.dot([traj[0]], { x: 'x', y: 'y', fill: '#ef4444', r: 6, stroke: '#fff', strokeWidth: 1.5 }));
+    }
+
+    // Origin
+    marks.push(window.Plot.dot([{ x: 0, y: 0 }], { x: 'x', y: 'y', fill: '#64748b', r: 5, opacity: 0.6 }));
+
+    const fig = window.Plot.plot({
+      width, height,
+      marginLeft: 50, marginBottom: 44,
+      x: { domain: [-bounds, bounds], grid: true, label: 'x' },
+      y: { domain: [-bounds, bounds], grid: true, label: 'y' },
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      marks
+    });
+
+    if (currentFig) { try { currentFig.remove(); } catch(_){} }
+    if (mount) { mount.innerHTML=''; mount.appendChild(fig); currentFig = fig; }
+
+    if (live) {
+      if (EI.real) {
+        const [l1, l2] = EI.values;
+        const stable = Math.abs(l1) < 1 && Math.abs(l2) < 1;
+        const status = stable ? 'stable (|λᵢ| < 1)' : 'unstable (some |λᵢ| ≥ 1)';
+        live.textContent = `λ₁=${l1.toFixed(3)}, λ₂=${l2.toFixed(3)} — ${status}`;
+      } else {
+        live.textContent = `complex eigenvalues (rotation-like)`;
+      }
+    }
+  }
+
+  function handleRun() {
+    state.trajectory = computeTrajectory();
+    render();
+  }
+
+  function handleReset() {
+    state.trajectory = [];
+    render();
+  }
+
+  if (!Plot) {
+    if (mount) mount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded.</div>';
+    return { destroy(){ containerEl.innerHTML=''; } };
+  }
+
+  [el.a, el.b, el.c, el.d].forEach(inp => inp && inp.addEventListener('input', () => {
+    state.trajectory = [];
+    render();
+  }));
+  [el.x0, el.y0, el.steps].forEach(inp => inp && inp.addEventListener('input', handleReset));
+  el.run && el.run.addEventListener('click', handleRun);
+  el.reset && el.reset.addEventListener('click', handleReset);
+
+  render();
+
+  return {
+    destroy() {
+      try {
+        [el.a, el.b, el.c, el.d, el.x0, el.y0, el.steps].forEach(inp => inp && inp.removeEventListener('input', render));
+        el.run && el.run.removeEventListener('click', handleRun);
+        el.reset && el.reset.removeEventListener('click', handleReset);
+      } catch(_){}
+      if (currentFig){ try{ currentFig.remove(); }catch(_){}}
+      containerEl.innerHTML='';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch4_stability_dynamics'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch4_stability_dynamics');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch4_stability_dynamics', e);
+    }
+  })();
+
   // ch6_unconstrained_foc_plot.js
   (function(){
     // Chapter 6: Unconstrained Optimization — FOC Illustration (Observable Plot)
