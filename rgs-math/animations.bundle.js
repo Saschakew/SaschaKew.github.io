@@ -2908,6 +2908,2405 @@ function init(containerEl, options = {}) {
     }
   })();
 
+  // ch5_chain_rule_blocks.js
+  (function(){
+    // Chapter 5: Chain rule composition diagram
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    n: finiteOr(options.n, 2),
+    m: finiteOr(options.m, 3),
+    k: finiteOr(options.k, 1)
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--diagram" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          Chain rule: J_{g∘f}(x) = J_g(f(x)) · J_f(x). Dimensions must match for composition.
+        </div>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="color: var(--text-secondary);">n (input dim)</span>
+          <input data-role="n" type="number" min="1" max="5" step="1" value="${state.n}" style="width:4rem;" aria-label="input dimension n"/>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="color: var(--text-secondary);">m (intermediate)</span>
+          <input data-role="m" type="number" min="1" max="5" step="1" value="${state.m}" style="width:4rem;" aria-label="intermediate dimension m"/>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="color: var(--text-secondary);">k (output dim)</span>
+          <input data-role="k" type="number" min="1" max="5" step="1" value="${state.k}" style="width:4rem;" aria-label="output dimension k"/>
+        </label>
+      </div>
+      <div class="anim__diagram-content" data-role="diagram" style="margin-top:1rem; padding:1.5rem; background:var(--bg-secondary); border-radius:0.5rem;">
+      </div>
+      <div class="anim__caption" style="margin-top:0.5rem; color: var(--text-secondary);">
+        Composition: x ∈ ℝⁿ → f(x) ∈ ℝᵐ → g(f(x)) ∈ ℝᵏ. Matrix multiplication: (k×m)·(m×n) = (k×n).
+      </div>
+    </div>
+  `;
+
+  const diagramEl = containerEl.querySelector('[data-role=diagram]');
+
+  const el = {
+    n: containerEl.querySelector('input[data-role=n]'),
+    m: containerEl.querySelector('input[data-role=m]'),
+    k: containerEl.querySelector('input[data-role=k]')
+  };
+
+  function render() {
+    const n = Math.max(1, Math.min(5, +el.n.value));
+    const m = Math.max(1, Math.min(5, +el.m.value));
+    const k = Math.max(1, Math.min(5, +el.k.value));
+
+    diagramEl.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:center; gap:2rem; flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="padding:1rem 1.5rem; background:var(--bg-primary); border:2px solid #3b82f6; border-radius:0.5rem; font-weight:500;">
+            x ∈ ℝⁿ
+          </div>
+          <div style="margin-top:0.3rem; color:var(--text-secondary); font-size:0.9rem;">n = ${n}</div>
+        </div>
+
+        <div style="text-align:center;">
+          <div style="font-size:1.5rem; color:var(--text-primary);">→</div>
+          <div style="margin-top:0.3rem; padding:0.4rem 0.8rem; background:#3b82f6; color:white; border-radius:0.3rem; font-size:0.85rem;">
+            J_f(x)
+          </div>
+          <div style="margin-top:0.2rem; color:var(--text-secondary); font-size:0.85rem;">(m×n) = (${m}×${n})</div>
+        </div>
+
+        <div style="text-align:center;">
+          <div style="padding:1rem 1.5rem; background:var(--bg-primary); border:2px solid #8b5cf6; border-radius:0.5rem; font-weight:500;">
+            f(x) ∈ ℝᵐ
+          </div>
+          <div style="margin-top:0.3rem; color:var(--text-secondary); font-size:0.9rem;">m = ${m}</div>
+        </div>
+
+        <div style="text-align:center;">
+          <div style="font-size:1.5rem; color:var(--text-primary);">→</div>
+          <div style="margin-top:0.3rem; padding:0.4rem 0.8rem; background:#8b5cf6; color:white; border-radius:0.3rem; font-size:0.85rem;">
+            J_g(f(x))
+          </div>
+          <div style="margin-top:0.2rem; color:var(--text-secondary); font-size:0.85rem;">(k×m) = (${k}×${m})</div>
+        </div>
+
+        <div style="text-align:center;">
+          <div style="padding:1rem 1.5rem; background:var(--bg-primary); border:2px solid #ef4444; border-radius:0.5rem; font-weight:500;">
+            g(f(x)) ∈ ℝᵏ
+          </div>
+          <div style="margin-top:0.3rem; color:var(--text-secondary); font-size:0.9rem;">k = ${k}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:2rem; padding:1rem; background:var(--bg-primary); border-left:4px solid #22c55e; border-radius:0.3rem;">
+        <div style="font-weight:600; margin-bottom:0.5rem; color:var(--text-primary);">Chain Rule Result:</div>
+        <div style="font-family:monospace; font-size:1.05rem; color:var(--text-primary);">
+          J_{g∘f}(x) = J_g(f(x)) · J_f(x)
+        </div>
+        <div style="margin-top:0.4rem; color:var(--text-secondary); font-size:0.9rem;">
+          Dimensions: (${k}×${m}) · (${m}×${n}) = (${k}×${n})
+        </div>
+        <div style="margin-top:0.4rem; color:var(--text-secondary); font-size:0.85rem; font-style:italic;">
+          Note: Rightmost matrix (J_f) is applied first; composition reads right-to-left.
+        </div>
+      </div>
+    `;
+  }
+
+  Object.values(el).forEach(inp => inp && inp.addEventListener('input', render));
+  render();
+
+  return { destroy(){ try { Object.values(el).forEach(inp => inp && inp.removeEventListener('input', render)); } catch(_){} containerEl.innerHTML=''; } };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_chain_rule_blocks'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_chain_rule_blocks');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_chain_rule_blocks', e);
+    }
+  })();
+
+  // ch5_directional_derivative_dot.js
+  (function(){
+    // Chapter 5: Directional derivative (3D wrapper)
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+  let childInst = null;
+  let destroyed = false;
+  try { containerEl.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Loading 3D directional derivative…</div>'; } catch(_){}
+  import('./ch5_directional_derivative_surface_3d.js')
+    .then(mod => {
+      if (destroyed) return;
+      if (mod && typeof mod.init === 'function') {
+        try { childInst = mod.init(containerEl, options) || null; } catch(e) { console.error('3D dir deriv init error', e); }
+      }
+    })
+    .catch(() => {
+      try { containerEl.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Failed to load 3D module.</div>'; } catch(_){}
+    });
+  return {
+    destroy() {
+      destroyed = true;
+      try { if (childInst && typeof childInst.destroy === 'function') childInst.destroy(); } catch(_){}
+      try { containerEl.innerHTML = ''; } catch(_){}
+    }
+  };
+}
+
+// OLD 2D implementation removed
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_directional_derivative_dot'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_directional_derivative_dot');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_directional_derivative_dot', e);
+    }
+  })();
+
+  // ch5_directional_derivative_surface_3d.js
+  (function(){
+    // Chapter 5: Directional derivative on 3D surface
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    f: options.f || 'x^2+y^2',
+    ax: finiteOr(options.ax, 1),
+    ay: finiteOr(options.ay, 1),
+    theta: finiteOr(options.theta, 0.5),
+    bounds: finiteOr(options.bounds, 2.5),
+    res: 40
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          D_u f(a) = ∇f(a)·u = ‖∇f(a)‖ cos(θ). Rotate u to see directional derivative change; max at θ=0 (gradient direction).
+        </div>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:2ch; color: var(--text-secondary);">x</span>
+          <input data-role="ax" type="range" min="-2" max="2" step="0.1" value="${state.ax}" style="width:140px;" aria-label="x"/>
+          <span data-role="ax-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.ax.toFixed(1)}</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:2ch; color: var(--text-secondary);">y</span>
+          <input data-role="ay" type="range" min="-2" max="2" step="0.1" value="${state.ay}" style="width:140px;" aria-label="y"/>
+          <span data-role="ay-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.ay.toFixed(1)}</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:2ch; color: var(--text-secondary);">θ</span>
+          <input data-role="theta" type="range" min="0" max="${2*Math.PI}" step="0.05" value="${state.theta}" style="width:180px;" aria-label="angle"/>
+          <span data-role="theta-val" style="min-width:5ch; font-variant-numeric:tabular-nums;">${state.theta.toFixed(2)}</span>
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div>
+            <div style="font-weight:500; margin-bottom:0.3rem; color:var(--text-primary);">3D Surface View</div>
+            <div class="anim__canvas" data-role="plot-3d" style="width:100%; height:480px;"></div>
+          </div>
+          <div>
+            <div style="font-weight:500; margin-bottom:0.3rem; color:var(--text-primary);">2D Contour View</div>
+            <div class="anim__canvas" data-role="plot-2d" style="width:100%; height:480px;"></div>
+          </div>
+        </div>
+        <div class="anim__legend" style="margin-top:0.5rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#ef4444;"></span>∇f(a)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#3b82f6;"></span>direction u(θ)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#8b5cf6;"></span>directional slice</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#f97316;"></span>(∂f/∂x)·u_x + (∂f/∂y)·u_y</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:12px; height:12px; background:#22c55e; border-radius:50%;"></span>(x,y,f)</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const mount3D = containerEl.querySelector('[data-role=plot-3d]');
+  const mount2D = containerEl.querySelector('[data-role=plot-2d]');
+  const live = containerEl.querySelector('[data-role=live]');
+  const el = {
+    ax: containerEl.querySelector('input[data-role=ax]'),
+    ay: containerEl.querySelector('input[data-role=ay]'),
+    theta: containerEl.querySelector('input[data-role=theta]'),
+    axVal: containerEl.querySelector('[data-role=ax-val]'),
+    ayVal: containerEl.querySelector('[data-role=ay-val]'),
+    thetaVal: containerEl.querySelector('[data-role=theta-val]')
+  };
+
+  let currentCamera = null;
+  let currentFig2D = null;
+
+  function loadPlotly() {
+    return new Promise((resolve, reject) => {
+      if (window.Plotly) return resolve(window.Plotly);
+      const scriptId = 'plotly-cdn-script';
+      const existing = document.getElementById(scriptId);
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.Plotly));
+        existing.addEventListener('error', reject);
+        return;
+      }
+      const s = document.createElement('script');
+      s.id = scriptId;
+      s.src = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+      s.async = true;
+      s.onload = () => resolve(window.Plotly);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  function evalF(x, y) {
+    try {
+      const expr = state.f.replace(/\^/g, '**').replace(/x/g, `(${x})`).replace(/y/g, `(${y})`);
+      return eval(expr);
+    } catch(e) {
+      return x*x + y*y;
+    }
+  }
+
+  function partialX(x, y, h=1e-3) { return (evalF(x+h, y) - evalF(x-h, y)) / (2*h); }
+  function partialY(x, y, h=1e-3) { return (evalF(x, y+h) - evalF(x, y-h)) / (2*h); }
+
+  let destroyed = false;
+  let plotReady = false;
+
+  function buildData() {
+    const B = state.bounds;
+    const N = state.res|0;
+    const xs = Array.from({length: N}, (_,i) => -B + (2*B*i)/(N-1));
+    const ys = Array.from({length: N}, (_,j) => -B + (2*B*j)/(N-1));
+    const Z = ys.map(y => xs.map(x => evalF(x,y)));
+
+    const ax = state.ax, ay = state.ay, fa = evalF(ax, ay);
+    const px = partialX(ax, ay), py = partialY(ax, ay);
+    const gradMag = Math.hypot(px, py);
+    const theta = state.theta;
+
+    // Direction u(theta)
+    const ux = Math.cos(theta);
+    const uy = Math.sin(theta);
+    const Du = px * ux + py * uy;
+
+    // Gradient arrow
+    const scaleG = Math.min(1.2, B * 0.35);
+    const gx = (gradMag > 1e-6) ? (px / gradMag) * scaleG : 0;
+    const gy = (gradMag > 1e-6) ? (py / gradMag) * scaleG : 0;
+    const gz = (gradMag > 1e-6) ? (px * gx + py * gy) : 0;
+
+    // Direction arrow u
+    const scaleU = Math.min(1.2, B * 0.35);
+    const uxS = ux * scaleU;
+    const uyS = uy * scaleU;
+    const uzS = px * uxS + py * uyS; // height change along u
+
+    // Directional slice: line from a in direction u on surface
+    const slicePts = [];
+    const steps = 50;
+    for (let i = -steps; i <= steps; i++) {
+      const t = (i / steps) * 1.5;
+      const x = ax + ux * t;
+      const y = ay + uy * t;
+      if (Math.abs(x) <= B && Math.abs(y) <= B) {
+        slicePts.push({ x, y, z: evalF(x, y) });
+      }
+    }
+
+    return { xs, ys, Z, ax, ay, fa, px, py, gx, gy, gz, uxS, uyS, uzS, gradMag, Du, slicePts, theta };
+  }
+
+  function layoutFor(B) {
+    const css = getComputedStyle(document.documentElement);
+    const textColor = (css.getPropertyValue('--text-secondary') || '#a0a0a0').trim();
+    return {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      margin: { l: 0, r: 0, t: 0, b: 0 },
+      scene: {
+        bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { title: 'x', color: textColor, gridcolor: textColor, zerolinecolor: textColor, range: [-B, B] },
+        yaxis: { title: 'y', color: textColor, gridcolor: textColor, zerolinecolor: textColor, range: [-B, B] },
+        zaxis: { title: 'z', color: textColor, gridcolor: textColor, zerolinecolor: textColor },
+        camera: { eye: { x: 1.6, y: 1.2, z: 0.9 } }
+      },
+      showlegend: false
+    };
+  }
+
+  function buildTraces(d) {
+    const surface = {
+      type: 'surface',
+      x: d.xs,
+      y: d.ys,
+      z: d.Z,
+      colorscale: 'Viridis',
+      showscale: false,
+      opacity: 0.88
+    };
+
+    const point = {
+      type: 'scatter3d', mode: 'markers',
+      x: [d.ax], y: [d.ay], z: [d.fa],
+      marker: { color: '#22c55e', size: 6 },
+      name: 'point'
+    };
+
+    // Gradient arrow
+    const grad = {
+      type: 'scatter3d', mode: 'lines',
+      x: [d.ax, d.ax + d.gx],
+      y: [d.ay, d.ay + d.gy],
+      z: [d.fa, d.fa + d.gz],
+      line: { color: '#ef4444', width: 10 },
+      name: 'gradient'
+    };
+
+    // Direction u arrow
+    const dirU = {
+      type: 'scatter3d', mode: 'lines',
+      x: [d.ax, d.ax + d.uxS],
+      y: [d.ay, d.ay + d.uyS],
+      z: [d.fa, d.fa + d.uzS],
+      line: { color: '#3b82f6', width: 10 },
+      name: 'direction u'
+    };
+
+    // Directional slice on surface
+    const slice = {
+      type: 'scatter3d', mode: 'lines',
+      x: d.slicePts.map(p => p.x),
+      y: d.slicePts.map(p => p.y),
+      z: d.slicePts.map(p => p.z),
+      line: { color: '#8b5cf6', width: 5 },
+      name: 'slice along u'
+    };
+
+    // Decomposition components in 3D (showing the sum visually)
+    // Component 1: horizontal step (∂f/∂x)·u_x
+    const ux = Math.cos(d.theta), uy = Math.sin(d.theta);
+    const comp1Len = 0.4;
+    const comp1X = d.ax + ux * comp1Len;
+    const comp1Z = d.fa + d.px * (ux * comp1Len);
+    
+    const comp1 = {
+      type: 'scatter3d', mode: 'lines',
+      x: [d.ax, comp1X],
+      y: [d.ay, d.ay + uy * comp1Len],
+      z: [d.fa, comp1Z],
+      line: { color: '#f97316', width: 6, dash: 'dot' },
+      name: 'partial x component'
+    };
+
+    // Component 2: from end of comp1
+    const comp2Z = comp1Z + d.py * (uy * comp1Len);
+    const comp2 = {
+      type: 'scatter3d', mode: 'lines',
+      x: [comp1X, comp1X],
+      y: [d.ay + uy * comp1Len, d.ay + uy * comp1Len],
+      z: [comp1Z, comp2Z],
+      line: { color: '#f97316', width: 6, dash: 'dot' },
+      name: 'partial y component'
+    };
+
+    return [surface, slice, point, grad, dirU, comp1, comp2];
+  }
+
+  async function render() {
+    if (destroyed) return;
+    el.axVal.textContent = (+el.ax.value).toFixed(1);
+    el.ayVal.textContent = (+el.ay.value).toFixed(1);
+    el.thetaVal.textContent = (+el.theta.value).toFixed(2);
+    state.ax = +el.ax.value;
+    state.ay = +el.ay.value;
+    state.theta = +el.theta.value;
+
+    try {
+      const Plotly = await loadPlotly();
+      const Plot = window.Plot;
+
+      // Capture camera
+      if (plotReady && mount3D && mount3D.layout && mount3D.layout.scene && mount3D.layout.scene.camera) {
+        currentCamera = JSON.parse(JSON.stringify(mount3D.layout.scene.camera));
+      }
+
+      const d = buildData();
+      const traces3D = buildTraces(d);
+      const layout3D = layoutFor(state.bounds);
+
+      if (currentCamera) {
+        layout3D.scene.camera = currentCamera;
+      }
+
+      const config = { displayModeBar: false, responsive: true };
+      
+      // Render 3D
+      if (!plotReady) {
+        await Plotly.newPlot(mount3D, traces3D, layout3D, config);
+        plotReady = true;
+      } else {
+        await Plotly.react(mount3D, traces3D, layout3D, config);
+      }
+
+      // Render 2D contour with decomposition
+      if (Plot && mount2D) {
+        const bounds = state.bounds;
+        const gridSize = 70;
+        const contourData = [];
+        for (let i = 0; i <= gridSize; i++) {
+          for (let j = 0; j <= gridSize; j++) {
+            const x = -bounds + (i * 2 * bounds) / gridSize;
+            const y = -bounds + (j * 2 * bounds) / gridSize;
+            contourData.push({ x, y, z: evalF(x, y) });
+          }
+        }
+
+        const marks2D = [];
+        marks2D.push(Plot.contour(contourData, {
+          x: 'x', y: 'y', z: 'z',
+          stroke: '#94a3b8',
+          strokeWidth: 1.2,
+          thresholds: 12,
+          opacity: 0.6
+        }));
+
+        const ux = Math.cos(state.theta);
+        const uy = Math.sin(state.theta);
+
+        // Show decomposition: D_u f = (∂f/∂x)·u_x + (∂f/∂y)·u_y
+        // Draw partial derivative components scaled by u_x and u_y
+        const scalePartial = 0.8;
+        
+        // Component 1: (∂f/∂x)·u_x in x-direction
+        const comp1Scale = (d.px * ux) * scalePartial / (d.gradMag + 1e-6);
+        marks2D.push(Plot.arrow([{ x1: d.ax, y1: d.ay, x2: d.ax + comp1Scale, y2: d.ay }], {
+          x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+          stroke: '#f97316', strokeWidth: 2.5, headLength: 10, opacity: 0.8
+        }));
+
+        // Component 2: (∂f/∂y)·u_y in y-direction (from end of comp1)
+        const comp2Scale = (d.py * uy) * scalePartial / (d.gradMag + 1e-6);
+        marks2D.push(Plot.arrow([{ x1: d.ax + comp1Scale, y1: d.ay, x2: d.ax + comp1Scale, y2: d.ay + comp2Scale }], {
+          x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+          stroke: '#f97316', strokeWidth: 2.5, headLength: 10, opacity: 0.8
+        }));
+
+        // Gradient arrow (for reference)
+        const scaleG = 1.0;
+        const gx = (d.gradMag > 1e-6) ? (d.px / d.gradMag) * scaleG : 0;
+        const gy = (d.gradMag > 1e-6) ? (d.py / d.gradMag) * scaleG : 0;
+        marks2D.push(Plot.arrow([{ x1: d.ax, y1: d.ay, x2: d.ax + gx, y2: d.ay + gy }], {
+          x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+          stroke: '#ef4444', strokeWidth: 3, headLength: 14, opacity: 0.7
+        }));
+
+        // Direction u arrow (scaled to show D_u f magnitude)
+        const uScale = Math.abs(d.Du) * scalePartial / (d.gradMag + 1e-6);
+        marks2D.push(Plot.arrow([{ x1: d.ax, y1: d.ay, x2: d.ax + ux * uScale, y2: d.ay + uy * uScale }], {
+          x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+          stroke: '#3b82f6', strokeWidth: 4, headLength: 14
+        }));
+
+        // Projection lines showing decomposition
+        marks2D.push(Plot.lineY([
+          { x: d.ax, y: d.ay },
+          { x: d.ax + comp1Scale, y: d.ay }
+        ], { x: 'x', y: 'y', stroke: '#f97316', strokeWidth: 1.5, strokeDasharray: '2 2', opacity: 0.5 }));
+
+        marks2D.push(Plot.lineY([
+          { x: d.ax + comp1Scale, y: d.ay },
+          { x: d.ax + comp1Scale, y: d.ay + comp2Scale }
+        ], { x: 'x', y: 'y', stroke: '#f97316', strokeWidth: 1.5, strokeDasharray: '2 2', opacity: 0.5 }));
+
+        marks2D.push(Plot.dot([{ x: d.ax, y: d.ay }], { x: 'x', y: 'y', fill: '#22c55e', r: 6 }));
+
+        // Text labels for components
+        marks2D.push(Plot.text([
+          { x: d.ax + comp1Scale/2, y: d.ay - 0.25, text: '(∂f/∂x)·u_x' }
+        ], { x: 'x', y: 'y', text: 'text', fill: '#f97316', fontSize: 11 }));
+
+        marks2D.push(Plot.text([
+          { x: d.ax + comp1Scale + 0.3, y: d.ay + comp2Scale/2, text: '(∂f/∂y)·u_y' }
+        ], { x: 'x', y: 'y', text: 'text', fill: '#f97316', fontSize: 11 }));
+
+        const width2D = Math.min(500, Math.max(320, (mount2D?.clientWidth || 400)));
+        const height2D = Math.round(width2D * 0.9);
+
+        const fig2D = Plot.plot({
+          width: width2D, height: height2D,
+          marginLeft: 50, marginBottom: 44,
+          x: { domain: [-bounds, bounds], label: 'x', grid: true },
+          y: { domain: [-bounds, bounds], label: 'y', grid: true },
+          style: { background: 'transparent', color: 'var(--text-secondary)' },
+          marks: marks2D
+        });
+
+        if (currentFig2D) { try { currentFig2D.remove(); } catch(_){} }
+        mount2D.innerHTML = '';
+        mount2D.appendChild(fig2D);
+        currentFig2D = fig2D;
+      }
+
+      if (live) {
+        const ux = Math.cos(state.theta), uy = Math.sin(state.theta);
+        const term1 = d.px * ux, term2 = d.py * uy;
+        live.textContent = `D_u f = (∂f/∂x)·u_x + (∂f/∂y)·u_y = (${d.px.toFixed(2)})·(${ux.toFixed(2)}) + (${d.py.toFixed(2)})·(${uy.toFixed(2)}) = ${d.Du.toFixed(2)}`;
+      }
+    } catch(e) {
+      if (mount3D) {
+        mount3D.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">3D library failed to load.</div>';
+      }
+    }
+  }
+
+  const listeners = [];
+  function on(elm, ev, fn) { if (!elm) return; elm.addEventListener(ev, fn); listeners.push([elm, ev, fn]); }
+
+  on(el.ax, 'input', render);
+  on(el.ay, 'input', render);
+  on(el.theta, 'input', render);
+
+  render();
+
+  return {
+    destroy() {
+      destroyed = true;
+      try { listeners.forEach(([elm, ev, fn]) => elm && elm.removeEventListener(ev, fn)); } catch(_){}
+      try { if (mount3D && window.Plotly) window.Plotly.purge(mount3D); } catch(_){}
+      try { if (currentFig2D) currentFig2D.remove(); } catch(_){}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_directional_derivative_surface_3d'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_directional_derivative_surface_3d');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_directional_derivative_surface_3d', e);
+    }
+  })();
+
+  // ch5_gradient_levelset_normal.js
+  (function(){
+    // Chapter 5: Gradient perpendicular to level sets (3D wrapper)
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+  let childInst = null;
+  let destroyed = false;
+  try { containerEl.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Loading 3D gradient…</div>'; } catch(_){}
+  import('./ch5_gradient_surface_3d.js')
+    .then(mod => {
+      if (destroyed) return;
+      if (mod && typeof mod.init === 'function') {
+        try { childInst = mod.init(containerEl, options) || null; } catch(e) { console.error('3D gradient init error', e); }
+      }
+    })
+    .catch(() => {
+      try { containerEl.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Failed to load 3D module.</div>'; } catch(_){}
+    });
+  return {
+    destroy() {
+      destroyed = true;
+      try { if (childInst && typeof childInst.destroy === 'function') childInst.destroy(); } catch(_){}
+      try { containerEl.innerHTML = ''; } catch(_){}
+    }
+  };
+}
+
+// OLD 2D implementation removed; now delegates to ch5_gradient_surface_3d.js
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_gradient_levelset_normal'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_gradient_levelset_normal');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_gradient_levelset_normal', e);
+    }
+  })();
+
+  // ch5_gradient_surface_3d.js
+  (function(){
+    // Chapter 5: Gradient on 3D surface with level sets
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    f: options.f || 'x^2+y^2',
+    ax: finiteOr(options.ax, 1),
+    ay: finiteOr(options.ay, 1),
+    bounds: finiteOr(options.bounds, 2.5),
+    res: 40
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          ∇f(a) is perpendicular to level sets and points in steepest ascent. Move (x,y) to see gradient on surface.
+        </div>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:2ch; color: var(--text-secondary);">x</span>
+          <input data-role="ax" type="range" min="-2" max="2" step="0.1" value="${state.ax}" style="width:160px;" aria-label="x"/>
+          <span data-role="ax-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.ax.toFixed(1)}</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:2ch; color: var(--text-secondary);">y</span>
+          <input data-role="ay" type="range" min="-2" max="2" step="0.1" value="${state.ay}" style="width:160px;" aria-label="y"/>
+          <span data-role="ay-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.ay.toFixed(1)}</span>
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div>
+            <div style="font-weight:500; margin-bottom:0.3rem; color:var(--text-primary);">3D Surface View</div>
+            <div class="anim__canvas" data-role="plot-3d" style="width:100%; height:480px;"></div>
+          </div>
+          <div>
+            <div style="font-weight:500; margin-bottom:0.3rem; color:var(--text-primary);">2D Contour View</div>
+            <div class="anim__canvas" data-role="plot-2d" style="width:100%; height:480px;"></div>
+          </div>
+        </div>
+        <div class="anim__legend" style="margin-top:0.5rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#ef4444;"></span>∇f(a) (gradient)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#3b82f6;"></span>level set at a</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:12px; height:12px; background:#22c55e; border-radius:50%;"></span>(x,y,f)</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const mount3D = containerEl.querySelector('[data-role=plot-3d]');
+  const mount2D = containerEl.querySelector('[data-role=plot-2d]');
+  const live = containerEl.querySelector('[data-role=live]');
+  const el = {
+    ax: containerEl.querySelector('input[data-role=ax]'),
+    ay: containerEl.querySelector('input[data-role=ay]'),
+    axVal: containerEl.querySelector('[data-role=ax-val]'),
+    ayVal: containerEl.querySelector('[data-role=ay-val]')
+  };
+
+  let currentCamera = null;
+  let currentFig2D = null;
+
+  function loadPlotly() {
+    return new Promise((resolve, reject) => {
+      if (window.Plotly) return resolve(window.Plotly);
+      const scriptId = 'plotly-cdn-script';
+      const existing = document.getElementById(scriptId);
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.Plotly));
+        existing.addEventListener('error', reject);
+        return;
+      }
+      const s = document.createElement('script');
+      s.id = scriptId;
+      s.src = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+      s.async = true;
+      s.onload = () => resolve(window.Plotly);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  function evalF(x, y) {
+    try {
+      const expr = state.f.replace(/\^/g, '**').replace(/x/g, `(${x})`).replace(/y/g, `(${y})`);
+      return eval(expr);
+    } catch(e) {
+      return x*x + y*y;
+    }
+  }
+
+  function partialX(x, y, h=1e-3) { return (evalF(x+h, y) - evalF(x-h, y)) / (2*h); }
+  function partialY(x, y, h=1e-3) { return (evalF(x, y+h) - evalF(x, y-h)) / (2*h); }
+
+  let destroyed = false;
+  let plotReady = false;
+
+  function buildData() {
+    const B = state.bounds;
+    const N = state.res|0;
+    const xs = Array.from({length: N}, (_,i) => -B + (2*B*i)/(N-1));
+    const ys = Array.from({length: N}, (_,j) => -B + (2*B*j)/(N-1));
+    const Z = ys.map(y => xs.map(x => evalF(x,y)));
+
+    const ax = state.ax, ay = state.ay, fa = evalF(ax, ay);
+    const px = partialX(ax, ay), py = partialY(ax, ay);
+    const gradMag = Math.hypot(px, py);
+
+    // Gradient arrow (scaled for visibility)
+    const scale = Math.min(1.5, B * 0.4);
+    const gx = (gradMag > 1e-6) ? (px / gradMag) * scale : 0;
+    const gy = (gradMag > 1e-6) ? (py / gradMag) * scale : 0;
+    const gz = (gradMag > 1e-6) ? (px * gx + py * gy) : 0;
+
+    // Level set curve at z=fa (contour on surface)
+    const levelPts = [];
+    const tol = 0.15;
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const x = xs[i], y = ys[j], z = evalF(x, y);
+        if (Math.abs(z - fa) < tol) {
+          levelPts.push({ x, y, z });
+        }
+      }
+    }
+
+    return { xs, ys, Z, ax, ay, fa, px, py, gx, gy, gz, gradMag, levelPts };
+  }
+
+  function layoutFor(B) {
+    const css = getComputedStyle(document.documentElement);
+    const textColor = (css.getPropertyValue('--text-secondary') || '#a0a0a0').trim();
+    return {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      margin: { l: 0, r: 0, t: 0, b: 0 },
+      scene: {
+        bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { title: 'x', color: textColor, gridcolor: textColor, zerolinecolor: textColor, range: [-B, B] },
+        yaxis: { title: 'y', color: textColor, gridcolor: textColor, zerolinecolor: textColor, range: [-B, B] },
+        zaxis: { title: 'z', color: textColor, gridcolor: textColor, zerolinecolor: textColor },
+        camera: { eye: { x: 1.6, y: 1.2, z: 0.9 } }
+      },
+      showlegend: false
+    };
+  }
+
+  function buildTraces(d) {
+    const surface = {
+      type: 'surface',
+      x: d.xs,
+      y: d.ys,
+      z: d.Z,
+      colorscale: 'Viridis',
+      showscale: false,
+      opacity: 0.88
+    };
+
+    const point = {
+      type: 'scatter3d', mode: 'markers',
+      x: [d.ax], y: [d.ay], z: [d.fa],
+      marker: { color: '#22c55e', size: 6 },
+      name: '(x,y,f)'
+    };
+
+    // Gradient arrow
+    const grad = {
+      type: 'scatter3d', mode: 'lines',
+      x: [d.ax, d.ax + d.gx],
+      y: [d.ay, d.ay + d.gy],
+      z: [d.fa, d.fa + d.gz],
+      line: { color: '#ef4444', width: 10 },
+      name: 'gradient'
+    };
+
+    // Level set
+    const levelSet = {
+      type: 'scatter3d', mode: 'markers',
+      x: d.levelPts.map(p => p.x),
+      y: d.levelPts.map(p => p.y),
+      z: d.levelPts.map(p => p.z),
+      marker: { color: '#3b82f6', size: 3, opacity: 0.7 },
+      name: 'level set'
+    };
+
+    return [surface, levelSet, point, grad];
+  }
+
+  async function render() {
+    if (destroyed) return;
+    el.axVal.textContent = (+el.ax.value).toFixed(1);
+    el.ayVal.textContent = (+el.ay.value).toFixed(1);
+    state.ax = +el.ax.value;
+    state.ay = +el.ay.value;
+
+    try {
+      const Plotly = await loadPlotly();
+      const Plot = window.Plot;
+
+      // Capture camera
+      if (plotReady && mount3D && mount3D.layout && mount3D.layout.scene && mount3D.layout.scene.camera) {
+        currentCamera = JSON.parse(JSON.stringify(mount3D.layout.scene.camera));
+      }
+
+      const d = buildData();
+      const traces3D = buildTraces(d);
+      const layout3D = layoutFor(state.bounds);
+
+      if (currentCamera) {
+        layout3D.scene.camera = currentCamera;
+      }
+
+      const config = { displayModeBar: false, responsive: true };
+      
+      // Render 3D
+      if (!plotReady) {
+        await Plotly.newPlot(mount3D, traces3D, layout3D, config);
+        plotReady = true;
+      } else {
+        await Plotly.react(mount3D, traces3D, layout3D, config);
+      }
+
+      // Render 2D contour
+      if (Plot && mount2D) {
+        const bounds = state.bounds;
+        const gridSize = 70;
+        const contourData = [];
+        for (let i = 0; i <= gridSize; i++) {
+          for (let j = 0; j <= gridSize; j++) {
+            const x = -bounds + (i * 2 * bounds) / gridSize;
+            const y = -bounds + (j * 2 * bounds) / gridSize;
+            contourData.push({ x, y, z: evalF(x, y) });
+          }
+        }
+
+        const marks2D = [];
+        
+        // All contours (light gray)
+        marks2D.push(Plot.contour(contourData, {
+          x: 'x', y: 'y', z: 'z',
+          stroke: '#94a3b8',
+          strokeWidth: 1,
+          opacity: 0.4,
+          thresholds: 12
+        }));
+
+        // Highlight the CURRENT level set at z = f(ax, ay) in bright blue
+        const currentLevel = d.fa;
+        const tolerance = 0.15;
+        const currentLevelPts = contourData.filter(p => Math.abs(p.z - currentLevel) < tolerance);
+        if (currentLevelPts.length > 0) {
+          marks2D.push(Plot.dot(currentLevelPts, {
+            x: 'x', y: 'y',
+            fill: '#3b82f6',
+            r: 2.5,
+            opacity: 0.9
+          }));
+        }
+
+        // Gradient arrow
+        const scale = 1.0;
+        const gx = (d.gradMag > 1e-6) ? (d.px / d.gradMag) * scale : 0;
+        const gy = (d.gradMag > 1e-6) ? (d.py / d.gradMag) * scale : 0;
+        marks2D.push(Plot.arrow([{ x1: d.ax, y1: d.ay, x2: d.ax + gx, y2: d.ay + gy }], {
+          x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+          stroke: '#ef4444', strokeWidth: 4, headLength: 14
+        }));
+
+        // Tangent to level set (perpendicular to gradient)
+        if (d.gradMag > 1e-6) {
+          const tx = -gy, ty = gx;
+          const tScale = 0.9;
+          marks2D.push(Plot.lineY([
+            { x: d.ax - tx * tScale, y: d.ay - ty * tScale },
+            { x: d.ax + tx * tScale, y: d.ay + ty * tScale }
+          ], { x: 'x', y: 'y', stroke: '#3b82f6', strokeWidth: 3, strokeDasharray: '4 2', opacity: 0.9 }));
+        }
+
+        marks2D.push(Plot.dot([{ x: d.ax, y: d.ay }], { x: 'x', y: 'y', fill: '#22c55e', r: 7 }));
+
+        // Label for current level set
+        marks2D.push(Plot.text([
+          { x: d.ax + 0.5, y: d.ay + 0.5, text: `level set: z=${d.fa.toFixed(2)}` }
+        ], { x: 'x', y: 'y', text: 'text', fill: '#3b82f6', fontSize: 12, fontWeight: 600 }));
+
+        const width2D = Math.min(500, Math.max(320, (mount2D?.clientWidth || 400)));
+        const height2D = Math.round(width2D * 0.9);
+
+        const fig2D = Plot.plot({
+          width: width2D, height: height2D,
+          marginLeft: 50, marginBottom: 44,
+          x: { domain: [-bounds, bounds], label: 'x', grid: true },
+          y: { domain: [-bounds, bounds], label: 'y', grid: true },
+          style: { background: 'transparent', color: 'var(--text-secondary)' },
+          marks: marks2D
+        });
+
+        if (currentFig2D) { try { currentFig2D.remove(); } catch(_){} }
+        mount2D.innerHTML = '';
+        mount2D.appendChild(fig2D);
+        currentFig2D = fig2D;
+      }
+
+      if (live) live.textContent = `∇f(${d.ax.toFixed(1)}, ${d.ay.toFixed(1)}) = (${d.px.toFixed(2)}, ${d.py.toFixed(2)}), ‖∇f‖ = ${d.gradMag.toFixed(2)}`;
+    } catch(e) {
+      if (mount3D) {
+        mount3D.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">3D library failed to load.</div>';
+      }
+    }
+  }
+
+  const listeners = [];
+  function on(elm, ev, fn) { if (!elm) return; elm.addEventListener(ev, fn); listeners.push([elm, ev, fn]); }
+
+  on(el.ax, 'input', render);
+  on(el.ay, 'input', render);
+
+  render();
+
+  return {
+    destroy() {
+      destroyed = true;
+      try { listeners.forEach(([elm, ev, fn]) => elm && elm.removeEventListener(ev, fn)); } catch(_){}
+      try { if (mount3D && window.Plotly) window.Plotly.purge(mount3D); } catch(_){}
+      try { if (currentFig2D) currentFig2D.remove(); } catch(_){}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_gradient_surface_3d'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_gradient_surface_3d');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_gradient_surface_3d', e);
+    }
+  })();
+
+  // ch5_hessian_classifier_tripanel.js
+  (function(){
+    // Chapter 5: Hessian curvature classifier (min, max, saddle)
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  const examples = options.examples || [
+    { type: 'min', eigs: [2, 2] },
+    { type: 'max', eigs: [-2, -2] },
+    { type: 'saddle', eigs: [2, -2] }
+  ];
+
+  containerEl.innerHTML = `
+    <div class="anim anim--tripanel" style="margin:0.75rem 0;">
+      <div class="anim__hint" style="padding:0.6rem 0.9rem; border:1px solid var(--border-color); border-radius:0.5rem; color: var(--text-secondary); margin-bottom:0.75rem;">
+        Hessian eigenvalues classify local shape at critical points. Use Chapter 4 eigenvalue test.
+      </div>
+      <div class="anim__panels" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:1rem;">
+        ${examples.map((ex, i) => `
+          <div data-role="panel-${i}" style="border:1px solid var(--border-color); border-radius:0.5rem; padding:0.75rem;">
+            <div style="font-weight:600; margin-bottom:0.5rem; color:var(--text-primary); text-align:center;">
+              ${ex.type === 'min' ? 'Minimum (PD)' : ex.type === 'max' ? 'Maximum (ND)' : 'Saddle (Indefinite)'}
+            </div>
+            <div class="anim__canvas" data-role="plot-${i}"></div>
+            <div style="margin-top:0.5rem; text-align:center; color:var(--text-secondary); font-size:0.9rem;">
+              eigs: ${ex.eigs.map(e => e > 0 ? `+${e}` : e).join(', ')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="anim__caption" style="margin-top:0.75rem; color: var(--text-secondary);">
+        All eigenvalues > 0 → min (bowl). All < 0 → max (dome). Mixed signs → saddle.
+      </div>
+    </div>
+  `;
+
+  const Plot = (window && window.Plot) ? window.Plot : null;
+
+  function getFunctionForType(type, eigs) {
+    if (type === 'min') {
+      return (x, y) => eigs[0] * x * x + eigs[1] * y * y;
+    } else if (type === 'max') {
+      return (x, y) => eigs[0] * x * x + eigs[1] * y * y;
+    } else { // saddle
+      return (x, y) => eigs[0] * x * x + eigs[1] * y * y;
+    }
+  }
+
+  const currentFigs = [];
+
+  function render() {
+    examples.forEach((ex, i) => {
+      const mount = containerEl.querySelector(`[data-role=plot-${i}]`);
+      if (!mount || !Plot) return;
+
+      const f = getFunctionForType(ex.type, ex.eigs);
+      const bounds = 2;
+      const gridSize = 60;
+      const contourData = [];
+
+      for (let ix = 0; ix <= gridSize; ix++) {
+        for (let iy = 0; iy <= gridSize; iy++) {
+          const x = -bounds + (ix * 2 * bounds) / gridSize;
+          const y = -bounds + (iy * 2 * bounds) / gridSize;
+          contourData.push({ x, y, z: f(x, y) });
+        }
+      }
+
+      const width = Math.min(300, Math.max(200, (mount?.clientWidth || 240)));
+      const height = Math.round(width * 0.85);
+
+      const marks = [];
+      marks.push(window.Plot.contour(contourData, {
+        x: 'x', y: 'y', z: 'z',
+        stroke: ex.type === 'min' ? '#3b82f6' : ex.type === 'max' ? '#ef4444' : '#f59e0b',
+        strokeWidth: 1.5,
+        thresholds: 10
+      }));
+
+      // Critical point at origin
+      marks.push(window.Plot.dot([{ x: 0, y: 0 }], { 
+        x: 'x', y: 'y', 
+        fill: '#22c55e', 
+        r: 6 
+      }));
+
+      const fig = window.Plot.plot({
+        width, height,
+        marginLeft: 40, marginBottom: 40,
+        x: { domain: [-bounds, bounds], grid: true, label: 'x' },
+        y: { domain: [-bounds, bounds], grid: true, label: 'y' },
+        style: { background: 'transparent', color: 'var(--text-secondary)' },
+        marks
+      });
+
+      if (currentFigs[i]) { try { currentFigs[i].remove(); } catch(_){} }
+      mount.innerHTML = '';
+      mount.appendChild(fig);
+      currentFigs[i] = fig;
+    });
+  }
+
+  if (!Plot) {
+    containerEl.querySelector('.anim__panels').innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded.</div>';
+    return { destroy(){ containerEl.innerHTML=''; } };
+  }
+
+  render();
+
+  return { destroy(){ try { currentFigs.forEach(fig => { try { fig.remove(); } catch(_){} }); } catch(_){} containerEl.innerHTML=''; } };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_hessian_classifier_tripanel'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_hessian_classifier_tripanel');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_hessian_classifier_tripanel', e);
+    }
+  })();
+
+  // ch5_jacobian_local_linear.js
+  (function(){
+    // Chapter 5: Jacobian as local linear map
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    a: finiteOr(options.a, 2),
+    b: finiteOr(options.b, 0.5),
+    c: finiteOr(options.c, -0.3),
+    d: finiteOr(options.d, 1.5),
+    bounds: 2,
+    gridStep: 0.5
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          Jacobian J_f(x) maps input grid to output grid. Columns of J are images of basis vectors.
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span style="min-width:7ch; text-align:right; color:var(--text-secondary);">J =</span>
+          <div style="display:inline-grid; grid-template-columns: auto auto; gap:0.25rem 0.35rem; align-items:center;">
+            <input data-role="a" type="number" step="0.1" value="${state.a}" style="width:5rem;" aria-label="J[0,0]">
+            <input data-role="b" type="number" step="0.1" value="${state.b}" style="width:5rem;" aria-label="J[0,1]">
+            <input data-role="c" type="number" step="0.1" value="${state.c}" style="width:5rem;" aria-label="J[1,0]">
+            <input data-role="d" type="number" step="0.1" value="${state.d}" style="width:5rem;" aria-label="J[1,1]">
+          </div>
+        </div>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem; display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+        <div>
+          <div style="font-weight:500; margin-bottom:0.3rem; color:var(--text-primary);">Input Space</div>
+          <div class="anim__canvas" data-role="plot-input"></div>
+        </div>
+        <div>
+          <div style="font-weight:500; margin-bottom:0.3rem; color:var(--text-primary);">Output Space (J·x)</div>
+          <div class="anim__canvas" data-role="plot-output"></div>
+        </div>
+      </div>
+      <div class="anim__legend" style="margin-top:0.5rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+        <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#94a3b8;"></span>grid lines</span>
+        <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#ef4444;"></span>e₁ → J·e₁</span>
+        <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#3b82f6;"></span>e₂ → J·e₂</span>
+      </div>
+    </div>
+  `;
+
+  const Plot = (window && window.Plot) ? window.Plot : null;
+  const mountIn = containerEl.querySelector('[data-role=plot-input]');
+  const mountOut = containerEl.querySelector('[data-role=plot-output]');
+  const live = containerEl.querySelector('[data-role=live]');
+
+  const el = {
+    a: containerEl.querySelector('input[data-role=a]'),
+    b: containerEl.querySelector('input[data-role=b]'),
+    c: containerEl.querySelector('input[data-role=c]'),
+    d: containerEl.querySelector('input[data-role=d]')
+  };
+
+  function apply(J, p) {
+    return { x: J[0]*p.x + J[1]*p.y, y: J[2]*p.x + J[3]*p.y };
+  }
+
+  let currentFigIn = null, currentFigOut = null;
+  function render() {
+    const J = [ +el.a.value, +el.b.value, +el.c.value, +el.d.value ];
+    const bounds = state.bounds;
+    const step = state.gridStep;
+
+    const width = Math.min(400, Math.max(280, (mountIn?.clientWidth || 320)));
+    const height = Math.round(width * 0.85);
+
+    // Input grid
+    const marksIn = [];
+    for (let x = -bounds; x <= bounds; x += step) {
+      const pts = [];
+      for (let y = -bounds; y <= bounds; y += step/10) {
+        pts.push({ x, y });
+      }
+      marksIn.push(window.Plot.lineY(pts, { x: 'x', y: 'y', stroke: '#94a3b8', strokeWidth: 1, opacity: 0.5 }));
+    }
+    for (let y = -bounds; y <= bounds; y += step) {
+      const pts = [];
+      for (let x = -bounds; x <= bounds; x += step/10) {
+        pts.push({ x, y });
+      }
+      marksIn.push(window.Plot.lineY(pts, { x: 'x', y: 'y', stroke: '#94a3b8', strokeWidth: 1, opacity: 0.5 }));
+    }
+
+    // Basis vectors
+    marksIn.push(window.Plot.arrow([{ x1: 0, y1: 0, x2: 1, y2: 0 }], {
+      x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+      stroke: '#ef4444', strokeWidth: 3, headLength: 10
+    }));
+    marksIn.push(window.Plot.arrow([{ x1: 0, y1: 0, x2: 0, y2: 1 }], {
+      x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+      stroke: '#3b82f6', strokeWidth: 3, headLength: 10
+    }));
+
+    const figIn = window.Plot.plot({
+      width, height,
+      marginLeft: 40, marginBottom: 40,
+      x: { domain: [-bounds, bounds], grid: true },
+      y: { domain: [-bounds, bounds], grid: true },
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      marks: marksIn
+    });
+
+    // Output grid (transformed)
+    const marksOut = [];
+    for (let x = -bounds; x <= bounds; x += step) {
+      const pts = [];
+      for (let y = -bounds; y <= bounds; y += step/10) {
+        pts.push(apply(J, { x, y }));
+      }
+      marksOut.push(window.Plot.lineY(pts, { x: 'x', y: 'y', stroke: '#94a3b8', strokeWidth: 1, opacity: 0.5 }));
+    }
+    for (let y = -bounds; y <= bounds; y += step) {
+      const pts = [];
+      for (let x = -bounds; x <= bounds; x += step/10) {
+        pts.push(apply(J, { x, y }));
+      }
+      marksOut.push(window.Plot.lineY(pts, { x: 'x', y: 'y', stroke: '#94a3b8', strokeWidth: 1, opacity: 0.5 }));
+    }
+
+    // Transformed basis vectors (columns of J)
+    const Je1 = apply(J, { x: 1, y: 0 });
+    const Je2 = apply(J, { x: 0, y: 1 });
+    marksOut.push(window.Plot.arrow([{ x1: 0, y1: 0, x2: Je1.x, y2: Je1.y }], {
+      x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+      stroke: '#ef4444', strokeWidth: 3, headLength: 10
+    }));
+    marksOut.push(window.Plot.arrow([{ x1: 0, y1: 0, x2: Je2.x, y2: Je2.y }], {
+      x1: 'x1', y1: 'y1', x2: 'x2', y2: 'y2',
+      stroke: '#3b82f6', strokeWidth: 3, headLength: 10
+    }));
+
+    const outBounds = Math.max(bounds, Math.abs(Je1.x), Math.abs(Je1.y), Math.abs(Je2.x), Math.abs(Je2.y)) * 1.2;
+
+    const figOut = window.Plot.plot({
+      width, height,
+      marginLeft: 40, marginBottom: 40,
+      x: { domain: [-outBounds, outBounds], grid: true },
+      y: { domain: [-outBounds, outBounds], grid: true },
+      style: { background: 'transparent', color: 'var(--text-secondary)' },
+      marks: marksOut
+    });
+
+    if (currentFigIn) { try { currentFigIn.remove(); } catch(_){} }
+    if (currentFigOut) { try { currentFigOut.remove(); } catch(_){} }
+    if (mountIn) { mountIn.innerHTML=''; mountIn.appendChild(figIn); currentFigIn = figIn; }
+    if (mountOut) { mountOut.innerHTML=''; mountOut.appendChild(figOut); currentFigOut = figOut; }
+
+    if (live) {
+      live.textContent = `J·e₁ = (${Je1.x.toFixed(2)}, ${Je1.y.toFixed(2)}), J·e₂ = (${Je2.x.toFixed(2)}, ${Je2.y.toFixed(2)})`;
+    }
+  }
+
+  if (!Plot) {
+    if (mountIn) mountIn.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded.</div>';
+    return { destroy(){ containerEl.innerHTML=''; } };
+  }
+
+  Object.values(el).forEach(inp => inp && inp.addEventListener('input', render));
+  render();
+
+  return { destroy(){ try { Object.values(el).forEach(inp => inp && inp.removeEventListener('input', render)); } catch(_){} if (currentFigIn){ try{ currentFigIn.remove(); }catch(_){}} if (currentFigOut){ try{ currentFigOut.remove(); }catch(_){}} containerEl.innerHTML=''; } };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_jacobian_local_linear'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_jacobian_local_linear');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_jacobian_local_linear', e);
+    }
+  })();
+
+  // ch5_partials_cross_sections.js
+  (function(){
+    // Chapter 5: Partial derivatives via cross-sections
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+  let childInst = null;
+  let destroyed = false;
+  try { containerEl.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Loading 3D surface…</div>'; } catch(_){}
+  import('./ch5_partials_surface_tangents_3d.js')
+    .then(mod => {
+      if (destroyed) return;
+      if (mod && typeof mod.init === 'function') {
+        try { childInst = mod.init(containerEl, options) || null; } catch(e) { console.error('3D init error', e); }
+      }
+    })
+    .catch(() => {
+      try { containerEl.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Failed to load 3D module.</div>'; } catch(_){}
+    });
+  return {
+    destroy() {
+      destroyed = true;
+      try { if (childInst && typeof childInst.destroy === 'function') childInst.destroy(); } catch(_){}
+      try { containerEl.innerHTML = ''; } catch(_){}
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_partials_cross_sections'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_partials_cross_sections');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_partials_cross_sections', e);
+    }
+  })();
+
+  // ch5_partials_surface_tangents_3d.js
+  (function(){
+    // Chapter 5: 3D surface with cross-sections and tangents at (x0,y0)
+// Public API: init(containerEl, options) -> { destroy }
+// Renders f(x,y) as a 3D surface (Plotly), shows slices y=y0 and x=x0, and tangent lines at the point.
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    f: options.f || 'x^2*y',
+    a1: finiteOr(options.a1, 1), // x0
+    a2: finiteOr(options.a2, 1), // y0
+    bounds: finiteOr(options.bounds, 2.5),
+    res: 40
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem;">
+          Move (x₀,y₀) in the plane. See: surface z=f(x,y), slices y=y₀ (blue) and x=x₀ (red), and tangent lines at (x₀,y₀) in 3D.
+        </div>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:3ch; color: var(--text-secondary);">x₀</span>
+          <input data-role="a1" type="range" min="-2.5" max="2.5" step="0.1" value="${state.a1}" style="width:160px;" aria-label="x0"/>
+          <span data-role="a1-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.a1.toFixed(1)}</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:3ch; color: var(--text-secondary);">y₀</span>
+          <input data-role="a2" type="range" min="-2.5" max="2.5" step="0.1" value="${state.a2}" style="width:160px;" aria-label="y0"/>
+          <span data-role="a2-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.a2.toFixed(1)}</span>
+        </label>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary);"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div>
+            <div style="font-weight:500; margin-bottom:0.3rem; color:var(--text-primary);">3D Surface View</div>
+            <div class="anim__canvas" data-role="plot-3d" style="width:100%; height:480px;"></div>
+          </div>
+          <div>
+            <div style="font-weight:500; margin-bottom:0.3rem; color:var(--text-primary);">2D Projection View</div>
+            <div class="anim__canvas" data-role="plot-2d" style="width:100%; height:480px;"></div>
+          </div>
+        </div>
+        <div class="anim__legend" style="margin-top:0.5rem; display:flex; gap:1rem; flex-wrap:wrap; color: var(--text-secondary);">
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#3b82f6;"></span>slice y=y₀</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#ef4444;"></span>slice x=x₀</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:12px; height:12px; background:#22c55e; border-radius:50%;"></span>(x₀,y₀,f)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#3b82f6; border-bottom:2px dashed #3b82f6;"></span>tangent along x</span>
+          <span style="display:inline-flex; align-items:center; gap:0.4rem;"><span style="display:inline-block; width:16px; height:3px; background:#ef4444; border-bottom:2px dashed #ef4444;"></span>tangent along y</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const mount3D = containerEl.querySelector('[data-role=plot-3d]');
+  const mount2D = containerEl.querySelector('[data-role=plot-2d]');
+  const live = containerEl.querySelector('[data-role=live]');
+  const el = {
+    a1: containerEl.querySelector('input[data-role=a1]'),
+    a2: containerEl.querySelector('input[data-role=a2]'),
+    a1Val: containerEl.querySelector('[data-role=a1-val]'),
+    a2Val: containerEl.querySelector('[data-role=a2-val]')
+  };
+
+  let currentCamera = null;
+  let currentFig2D = null;
+
+  // Lazy-load Plotly if needed
+  function loadPlotly() {
+    return new Promise((resolve, reject) => {
+      if (window.Plotly) return resolve(window.Plotly);
+      const scriptId = 'plotly-cdn-script';
+      const existing = document.getElementById(scriptId);
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.Plotly));
+        existing.addEventListener('error', reject);
+        return;
+      }
+      const s = document.createElement('script');
+      s.id = scriptId;
+      s.src = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+      s.async = true;
+      s.onload = () => resolve(window.Plotly);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  function evalF(x, y) {
+    try {
+      const expr = state.f.replace(/\^/g, '**').replace(/x/g, `(${x})`).replace(/y/g, `(${y})`);
+      // eslint-disable-next-line no-eval
+      return eval(expr);
+    } catch(e) {
+      return x*x*y; // fallback
+    }
+  }
+
+  function partialX(x, y, h=1e-3) { return (evalF(x+h, y) - evalF(x-h, y)) / (2*h); }
+  function partialY(x, y, h=1e-3) { return (evalF(x, y+h) - evalF(x, y-h)) / (2*h); }
+
+  let destroyed = false;
+  let plotReady = false;
+
+  function buildData() {
+    const B = state.bounds;
+    const N = state.res|0;
+    // Surface grid
+    const xs = Array.from({length: N}, (_,i) => -B + (2*B*i)/(N-1));
+    const ys = Array.from({length: N}, (_,j) => -B + (2*B*j)/(N-1));
+    const Z = ys.map(y => xs.map(x => evalF(x,y)));
+
+    // Cross-section y=y0 (vary x)
+    const xline = xs.map(x => x);
+    const ylineY0 = xs.map(_ => state.a2);
+    const zlineY0 = xs.map(x => evalF(x, state.a2));
+
+    // Cross-section x=x0 (vary y)
+    const yline = ys.map(y => y);
+    const xlineX0 = ys.map(_ => state.a1);
+    const zlineX0 = ys.map(y => evalF(state.a1, y));
+
+    // Point and tangents
+    const x0 = state.a1, y0 = state.a2, z0 = evalF(x0, y0);
+    const fx = partialX(x0, y0), fy = partialY(x0, y0);
+    const len = 1.2; // tangent half-length in parameter space (doubled for visibility)
+
+    // Tangent along x (holding y=y0): (x0±t, y0, z0 + fx*t)
+    const tx = [x0 - len, x0 + len];
+    const ty = [y0, y0];
+    const tz = [z0 - fx*len, z0 + fx*len];
+
+    // Tangent along y (holding x=x0): (x0, y0±t, z0 + fy*t)
+    const ux = [x0, x0];
+    const uy = [y0 - len, y0 + len];
+    const uz = [z0 - fy*len, z0 + fy*len];
+
+    return { xs, ys, Z, xline, ylineY0, zlineY0, yline, xlineX0, zlineX0, x0, y0, z0, tx, ty, tz, ux, uy, uz, fx, fy };
+  }
+
+  function layoutFor(B) {
+    const css = getComputedStyle(document.documentElement);
+    const textColor = (css.getPropertyValue('--text-secondary') || '#a0a0a0').trim();
+    const bg = (css.getPropertyValue('--bg-primary') || '#0b0b0b').trim();
+    return {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      margin: { l: 0, r: 0, t: 0, b: 0 },
+      scene: {
+        bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { title: 'x', color: textColor, gridcolor: textColor, zerolinecolor: textColor, range: [-B, B] },
+        yaxis: { title: 'y', color: textColor, gridcolor: textColor, zerolinecolor: textColor, range: [-B, B] },
+        zaxis: { title: 'z', color: textColor, gridcolor: textColor, zerolinecolor: textColor },
+        camera: { eye: { x: 1.6, y: 1.2, z: 0.9 } }
+      },
+      showlegend: false
+    };
+  }
+
+  function buildTraces(d) {
+    const surface = {
+      type: 'surface',
+      x: d.xs,
+      y: d.ys,
+      z: d.Z,
+      colorscale: 'Viridis',
+      showscale: false,
+      opacity: 0.92
+    };
+
+    const sliceY0 = {
+      type: 'scatter3d', mode: 'lines',
+      x: d.xline, y: d.ylineY0, z: d.zlineY0,
+      line: { color: '#3b82f6', width: 6 },
+      name: 'y=y0'
+    };
+
+    const sliceX0 = {
+      type: 'scatter3d', mode: 'lines',
+      x: d.xlineX0, y: d.yline, z: d.zlineX0,
+      line: { color: '#ef4444', width: 6 },
+      name: 'x=x0'
+    };
+
+    const point = {
+      type: 'scatter3d', mode: 'markers',
+      x: [d.x0], y: [d.y0], z: [d.z0],
+      marker: { color: '#22c55e', size: 5 },
+      name: '(x0,y0)'
+    };
+
+    const tanX = {
+      type: 'scatter3d', mode: 'lines',
+      x: d.tx, y: d.ty, z: d.tz,
+      line: { color: '#3b82f6', width: 8, dash: 'dash' },
+      name: 'tangent x'
+    };
+
+    const tanY = {
+      type: 'scatter3d', mode: 'lines',
+      x: d.ux, y: d.uy, z: d.uz,
+      line: { color: '#ef4444', width: 8, dash: 'dash' },
+      name: 'tangent y'
+    };
+
+    return [surface, sliceY0, sliceX0, point, tanX, tanY];
+  }
+
+  async function render() {
+    if (destroyed) return;
+    el.a1Val.textContent = (+el.a1.value).toFixed(1);
+    el.a2Val.textContent = (+el.a2.value).toFixed(1);
+    state.a1 = +el.a1.value;
+    state.a2 = +el.a2.value;
+
+    try {
+      const Plotly = await loadPlotly();
+      const Plot = window.Plot;
+      
+      // Capture current camera if plot exists
+      if (plotReady && mount3D && mount3D.layout && mount3D.layout.scene && mount3D.layout.scene.camera) {
+        currentCamera = JSON.parse(JSON.stringify(mount3D.layout.scene.camera));
+      }
+      
+      const d = buildData();
+      const traces3D = buildTraces(d);
+      const layout3D = layoutFor(state.bounds);
+      
+      // Restore camera if available
+      if (currentCamera) {
+        layout3D.scene.camera = currentCamera;
+      }
+      
+      const config = { displayModeBar: false, responsive: true };
+      
+      // Render 3D
+      if (!plotReady) {
+        await Plotly.newPlot(mount3D, traces3D, layout3D, config);
+        plotReady = true;
+      } else {
+        await Plotly.react(mount3D, traces3D, layout3D, config);
+      }
+
+      // Render 2D projection (xy-plane with slices projected)
+      if (Plot && mount2D) {
+        const bounds = state.bounds;
+        const marks2D = [];
+
+        // Contour
+        const gridSize = 60;
+        const contourData = [];
+        for (let i = 0; i <= gridSize; i++) {
+          for (let j = 0; j <= gridSize; j++) {
+            const x = -bounds + (i * 2 * bounds) / gridSize;
+            const y = -bounds + (j * 2 * bounds) / gridSize;
+            contourData.push({ x, y, z: evalF(x, y) });
+          }
+        }
+        marks2D.push(Plot.contour(contourData, {
+          x: 'x', y: 'y', z: 'z',
+          stroke: '#94a3b8',
+          strokeWidth: 1,
+          thresholds: 12,
+          opacity: 0.5
+        }));
+
+        // Slice lines in xy-plane
+        marks2D.push(Plot.lineY([
+          { x: -bounds, y: d.y0 },
+          { x: bounds, y: d.y0 }
+        ], { x: 'x', y: 'y', stroke: '#3b82f6', strokeWidth: 2.5, opacity: 0.8 }));
+
+        marks2D.push(Plot.lineY([
+          { x: d.x0, y: -bounds },
+          { x: d.x0, y: bounds }
+        ], { x: 'x', y: 'y', stroke: '#ef4444', strokeWidth: 2.5, opacity: 0.8 }));
+
+        marks2D.push(Plot.dot([{ x: d.x0, y: d.y0 }], { x: 'x', y: 'y', fill: '#22c55e', r: 6 }));
+
+        const width2D = Math.min(500, Math.max(320, (mount2D?.clientWidth || 400)));
+        const height2D = Math.round(width2D * 0.9);
+
+        const fig2D = Plot.plot({
+          width: width2D, height: height2D,
+          marginLeft: 50, marginBottom: 44,
+          x: { domain: [-bounds, bounds], label: 'x', grid: true },
+          y: { domain: [-bounds, bounds], label: 'y', grid: true },
+          style: { background: 'transparent', color: 'var(--text-secondary)' },
+          marks: marks2D
+        });
+
+        if (currentFig2D) { try { currentFig2D.remove(); } catch(_){} }
+        mount2D.innerHTML = '';
+        mount2D.appendChild(fig2D);
+        currentFig2D = fig2D;
+      }
+
+      if (live) live.textContent = `f(x0,y0)=${d.z0.toFixed(2)}, ∂f/∂x=${d.fx.toFixed(2)}, ∂f/∂y=${d.fy.toFixed(2)}`;
+    } catch(e) {
+      if (mount3D) {
+        mount3D.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">3D library failed to load. Check internet access.</div>';
+      }
+    }
+  }
+
+  const listeners = [];
+  function on(elm, ev, fn) { if (!elm) return; elm.addEventListener(ev, fn); listeners.push([elm, ev, fn]); }
+
+  on(el.a1, 'input', render);
+  on(el.a2, 'input', render);
+
+  render();
+
+  return {
+    destroy() {
+      destroyed = true;
+      try { listeners.forEach(([elm, ev, fn]) => elm && elm.removeEventListener(ev, fn)); } catch(_){}
+      try { if (mount3D && window.Plotly) window.Plotly.purge(mount3D); } catch(_){}
+      try { if (currentFig2D) currentFig2D.remove(); } catch(_){}
+      containerEl.innerHTML = '';
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_partials_surface_tangents_3d'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_partials_surface_tangents_3d');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_partials_surface_tangents_3d', e);
+    }
+  })();
+
+  // ch5_taylor_overlays.js
+  (function(){
+    // Chapter 5: Taylor approximation overlays (0th, 1st, 2nd order)
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    f: options.f || "x^2+y^2",
+    ax: finiteOr(options.ax, 0.5),
+    ay: finiteOr(options.ay, 0.5),
+    r: finiteOr(options.r, 1),
+    showTrue: options.showTrue !== false,
+    showLinear: options.showLinear !== false,
+    showQuadratic: options.showQuadratic !== false,
+    bounds: 2.5,
+    numContours: 12
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem; font-size:0.9rem; line-height:1.4;">
+          <strong>Taylor's Theorem Visualization:</strong> Compare true function f(x,y) = x² + y² with its Taylor approximations at point <strong>a=(x,y)</strong>.<br>
+          <strong>Linear:</strong> f(a) + ∇f(a)ᵀ(x−a) &nbsp;|&nbsp; <strong>Quadratic:</strong> f(a) + ∇f(a)ᵀ(x−a) + ½(x−a)ᵀH(a)(x−a)
+        </div>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:6ch; color: var(--text-secondary);">Point x:</span>
+          <input data-role="ax" type="range" min="-2" max="2" step="0.1" value="${state.ax}" style="width:120px;" aria-label="x coordinate"/>
+          <span data-role="ax-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.ax.toFixed(1)}</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:6ch; color: var(--text-secondary);">Point y:</span>
+          <input data-role="ay" type="range" min="-2" max="2" step="0.1" value="${state.ay}" style="width:120px;" aria-label="y coordinate"/>
+          <span data-role="ay-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.ay.toFixed(1)}</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:6ch; color: var(--text-secondary);">Radius:</span>
+          <input data-role="r" type="range" min="0.2" max="2" step="0.1" value="${state.r}" style="width:140px;" aria-label="radius"/>
+          <span data-role="r-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.r.toFixed(1)}</span>
+        </label>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <label style="display:inline-flex; gap:0.35rem; align-items:center;"><input data-role="true" type="checkbox" ${state.showTrue?'checked':''} aria-label="Show true function"/> True f(x,y)</label>
+          <label style="display:inline-flex; gap:0.35rem; align-items:center;"><input data-role="linear" type="checkbox" ${state.showLinear?'checked':''} aria-label="Show linear"/> Linear (1st order)</label>
+          <label style="display:inline-flex; gap:0.35rem; align-items:center;"><input data-role="quad" type="checkbox" ${state.showQuadratic?'checked':''} aria-label="Show quadratic"/> Quadratic (2nd order)</label>
+        </div>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary); font-size:0.9rem;"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div class="anim__canvas" data-role="plot"></div>
+        <div class="anim__legend" style="margin-top:0.5rem; padding:0.5rem 0.75rem; background:var(--bg-tertiary); border-radius:0.375rem; display:flex; gap:1.25rem; flex-wrap:wrap; font-size:0.9rem;">
+          <div style="font-weight:600; color:var(--text-primary); width:100%;">Legend:</div>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:20px; height:3px; background:#94a3b8;"></span><strong>True function</strong> f(x,y)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:20px; height:3px; background:#3b82f6; opacity:0.8;"></span><strong>Linear</strong> (1st order)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:20px; height:3px; background:#8b5cf6; opacity:0.8;"></span><strong>Quadratic</strong> (2nd order)</span>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:14px; height:14px; border-radius:50%; background:#22c55e;"></span>Expansion point <strong>a</strong></span>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:20px; height:2px; background:#22c55e; opacity:0.5;"></span>Approximation radius</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const Plot = (window && window.Plot) ? window.Plot : null;
+  const mount = containerEl.querySelector('[data-role=plot]');
+  const live = containerEl.querySelector('[data-role=live]');
+
+  const el = {
+    ax: containerEl.querySelector('input[data-role=ax]'),
+    ay: containerEl.querySelector('input[data-role=ay]'),
+    r: containerEl.querySelector('input[data-role=r]'),
+    trueBox: containerEl.querySelector('input[data-role=true]'),
+    linear: containerEl.querySelector('input[data-role=linear]'),
+    quad: containerEl.querySelector('input[data-role=quad]'),
+    axVal: containerEl.querySelector('[data-role=ax-val]'),
+    ayVal: containerEl.querySelector('[data-role=ay-val]'),
+    rVal: containerEl.querySelector('[data-role=r-val]')
+  };
+
+  function evalF(x, y) {
+    try {
+      const expr = state.f.replace(/\^/g, '**').replace(/x/g, `(${x})`).replace(/y/g, `(${y})`);
+      return eval(expr);
+    } catch(e) {
+      return x*x + y*y;
+    }
+  }
+
+  function partialX(x, y, h=0.001) {
+    return (evalF(x+h, y) - evalF(x-h, y)) / (2*h);
+  }
+  function partialY(x, y, h=0.001) {
+    return (evalF(x, y+h) - evalF(x, y-h)) / (2*h);
+  }
+  function partialXX(x, y, h=0.001) {
+    return (evalF(x+h, y) - 2*evalF(x, y) + evalF(x-h, y)) / (h*h);
+  }
+  function partialYY(x, y, h=0.001) {
+    return (evalF(x, y+h) - 2*evalF(x, y) + evalF(x, y-h)) / (h*h);
+  }
+  function partialXY(x, y, h=0.001) {
+    return (evalF(x+h, y+h) - evalF(x+h, y-h) - evalF(x-h, y+h) + evalF(x-h, y-h)) / (4*h*h);
+  }
+
+  let currentFig = null;
+  function render() {
+    const ax = +el.ax.value;
+    const ay = +el.ay.value;
+    const r = +el.r.value;
+    const showTrue = !!el.trueBox.checked;
+    const showLinear = !!el.linear.checked;
+    const showQuad = !!el.quad.checked;
+
+    el.axVal.textContent = ax.toFixed(1);
+    el.ayVal.textContent = ay.toFixed(1);
+    el.rVal.textContent = r.toFixed(1);
+
+    const bounds = state.bounds;
+    const width = Math.min(820, Math.max(420, (mount?.clientWidth || 560)));
+    const height = Math.round(width * 0.75);
+
+    const fa = evalF(ax, ay);
+    const px = partialX(ax, ay);
+    const py = partialY(ax, ay);
+    const fxx = partialXX(ax, ay);
+    const fyy = partialYY(ax, ay);
+    const fxy = partialXY(ax, ay);
+
+    // Generate contour levels
+    const minZ = 0;
+    const maxZ = bounds * bounds * 2;
+    const levels = Array.from({length: state.numContours}, (_, i) => 
+      minZ + (i + 1) * (maxZ - minZ) / (state.numContours + 1)
+    );
+
+    const marks = [];
+
+    // Helper: draw contours using raster approach
+    function drawContours(valueFunc, color, dasharray = null, opacity = 1) {
+      const n = 80;
+      const values = [];
+      const xs = [];
+      const ys = [];
+      
+      for (let i = 0; i <= n; i++) {
+        const row = [];
+        for (let j = 0; j <= n; j++) {
+          const x = -bounds + (j * 2 * bounds) / n;
+          const y = -bounds + (i * 2 * bounds) / n;
+          if (i === 0) xs.push(x);
+          row.push(valueFunc(x, y));
+        }
+        ys.push(-bounds + (i * 2 * bounds) / n);
+        values.push(row);
+      }
+
+      // Use d3.contours
+      if (window.d3 && window.d3.contours) {
+        const contours = window.d3.contours()
+          .size([n + 1, n + 1])
+          .thresholds(levels);
+        
+        const contourData = contours(values.flat());
+        
+        contourData.forEach(contour => {
+          const paths = [];
+          contour.coordinates.forEach(polygon => {
+            polygon.forEach(ring => {
+              const points = ring.map(([j, i]) => ({
+                x: xs[Math.floor(j)],
+                y: ys[Math.floor(i)]
+              }));
+              if (points.length > 2) {
+                marks.push(Plot.line(points, {
+                  x: 'x', y: 'y',
+                  stroke: color,
+                  strokeWidth: 2.5,
+                  strokeDasharray: dasharray,
+                  strokeOpacity: opacity
+                }));
+              }
+            });
+          });
+        });
+      }
+    }
+
+    // True function contours
+    if (showTrue) {
+      drawContours((x, y) => evalF(x, y), '#94a3b8');
+    }
+
+    // Linear approximation contours
+    if (showLinear) {
+      drawContours((x, y) => {
+        const dx = x - ax, dy = y - ay;
+        return fa + px * dx + py * dy;
+      }, '#3b82f6', '6 4', 0.85);
+    }
+
+    // Quadratic approximation contours
+    if (showQuad) {
+      drawContours((x, y) => {
+        const dx = x - ax, dy = y - ay;
+        return fa + px * dx + py * dy + 0.5 * (fxx * dx * dx + 2 * fxy * dx * dy + fyy * dy * dy);
+      }, '#8b5cf6', '4 3', 0.85);
+    }
+
+    // Radius circle
+    const circlePoints = [];
+    for (let i = 0; i <= 100; i++) {
+      const angle = (i / 100) * 2 * Math.PI;
+      circlePoints.push({ x: ax + r * Math.cos(angle), y: ay + r * Math.sin(angle) });
+    }
+    marks.push(Plot.line(circlePoints, { 
+      x: 'x', y: 'y', 
+      stroke: '#22c55e', 
+      strokeWidth: 2, 
+      strokeOpacity: 0.6 
+    }));
+
+    // Expansion point
+    marks.push(Plot.dot([{ x: ax, y: ay }], { 
+      x: 'x', y: 'y', 
+      fill: '#22c55e', 
+      r: 7, 
+      stroke: '#166534', 
+      strokeWidth: 2.5 
+    }));
+
+    const fig = Plot.plot({
+      width, height,
+      marginLeft: 55, marginBottom: 50, marginTop: 25, marginRight: 25,
+      x: { domain: [-bounds, bounds], label: 'x →', grid: true },
+      y: { domain: [-bounds, bounds], label: '↑ y', grid: true },
+      style: { background: 'transparent' },
+      marks
+    });
+
+    if (currentFig) { try { currentFig.remove(); } catch(_){} }
+    if (mount) { mount.innerHTML=''; mount.appendChild(fig); currentFig = fig; }
+
+    if (live) {
+      const fa_val = evalF(ax, ay).toFixed(2);
+      live.textContent = `Expansion point a=(${ax.toFixed(1)}, ${ay.toFixed(1)}), f(a)=${fa_val}, approximation radius=${r.toFixed(1)}`;
+    }
+  }
+
+  if (!Plot) {
+    if (mount) mount.innerHTML = '<div style="padding:0.75rem; color: var(--text-secondary);">Plot library not loaded.</div>';
+    return { destroy(){ containerEl.innerHTML=''; } };
+  }
+
+  Object.values(el).filter(e => e?.addEventListener).forEach(inp => inp.addEventListener('input', render));
+  render();
+
+  return { destroy(){ try { Object.values(el).filter(e => e?.removeEventListener).forEach(inp => inp.removeEventListener('input', render)); } catch(_){} if (currentFig){ try{ currentFig.remove(); }catch(_){}} containerEl.innerHTML=''; } };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_taylor_overlays'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_taylor_overlays');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_taylor_overlays', e);
+    }
+  })();
+
+  // ch5_taylor_surfaces_3d.js
+  (function(){
+    // Chapter 5: Taylor approximation surfaces in 3D
+// Public API: init(containerEl, options) -> { destroy }
+
+function init(containerEl, options = {}) {
+  if (!containerEl) return { destroy() {} };
+
+  function finiteOr(v, d) { const x = +v; return Number.isFinite(x) ? x : d; }
+
+  const state = {
+    f: options.f || 'x^2*y',
+    ax: finiteOr(options.ax, 1),
+    ay: finiteOr(options.ay, 1),
+    zoom: finiteOr(options.zoom, 3),
+    showTrue: options.showTrue !== false,
+    showLinear: options.showLinear !== false,
+    showQuadratic: options.showQuadratic !== false,
+    res: 30
+  };
+
+  containerEl.innerHTML = `
+    <div class="anim anim--plot" style="margin:0.75rem 0;">
+      <div class="anim__controls" style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; border:1px solid var(--border-color); border-radius:0.5rem; padding:0.6rem 0.9rem;">
+        <div class="anim__hint" style="flex:1 1 100%; color: var(--text-secondary); margin-bottom:0.25rem; font-size:0.95rem; line-height:1.4;">
+          <strong>Taylor's Theorem in 3D:</strong> Approximations work best <em>near</em> point <strong>a</strong>. <strong style="color:var(--text-primary);">Zoom in close to see them converge!</strong>
+        </div>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:6ch; color: var(--text-secondary);">Point x:</span>
+          <input data-role="ax" type="range" min="-1.5" max="1.5" step="0.1" value="${state.ax}" style="width:140px;" aria-label="x"/>
+          <span data-role="ax-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.ax.toFixed(1)}</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:6ch; color: var(--text-secondary);">Point y:</span>
+          <input data-role="ay" type="range" min="-1.5" max="1.5" step="0.1" value="${state.ay}" style="width:140px;" aria-label="y"/>
+          <span data-role="ay-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${state.ay.toFixed(1)}</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:0.5rem;">
+          <span style="min-width:6ch; color: var(--text-secondary); font-weight:600;">🔍 Zoom:</span>
+          <input data-role="zoom" type="range" min="1" max="10" step="0.1" value="${(3/state.zoom).toFixed(1)}" style="width:160px;" aria-label="zoom level"/>
+          <span data-role="zoom-val" style="min-width:4ch; font-variant-numeric:tabular-nums;">${(3/state.zoom).toFixed(1)}x</span>
+        </label>
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.25rem;">
+          <label style="display:inline-flex; gap:0.35rem; align-items:center;"><input data-role="true" type="checkbox" ${state.showTrue?'checked':''} aria-label="Show true surface"/> True f(x,y)</label>
+          <label style="display:inline-flex; gap:0.35rem; align-items:center;"><input data-role="linear" type="checkbox" ${state.showLinear?'checked':''} aria-label="Show linear"/> Linear (tangent plane)</label>
+          <label style="display:inline-flex; gap:0.35rem; align-items:center;"><input data-role="quad" type="checkbox" ${state.showQuadratic?'checked':''} aria-label="Show quadratic"/> Quadratic</label>
+        </div>
+        <div role="status" aria-live="polite" data-role="live" style="color: var(--text-secondary); font-size:0.9rem;"></div>
+      </div>
+      <div class="anim__canvases" style="margin-top:0.6rem;">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem;">
+          <div>
+            <div style="font-weight:600; margin-bottom:0.5rem; color:var(--text-primary); font-size:0.95rem;">📍 Overview (full function)</div>
+            <div class="anim__canvas" data-role="plot-overview" style="width:100%; height:480px;"></div>
+          </div>
+          <div>
+            <div style="font-weight:600; margin-bottom:0.5rem; color:var(--text-primary); font-size:0.95rem;">🔍 Zoomed View (approximations)</div>
+            <div class="anim__canvas" data-role="plot-3d" style="width:100%; height:480px;"></div>
+          </div>
+        </div>
+        <div class="anim__legend" style="margin-top:0.5rem; padding:0.5rem 0.75rem; background:var(--bg-tertiary); border-radius:0.375rem; display:flex; gap:1.25rem; flex-wrap:wrap; font-size:0.9rem;">
+          <div style="font-weight:600; color:var(--text-primary); width:100%;">Surfaces:</div>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:20px; height:3px; background:#6366f1;"></span><strong>True function</strong> f(x,y) = x²y</span>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:20px; height:3px; background:#f97316;"></span><strong>Linear</strong> tangent plane</span>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:20px; height:3px; background:#22c55e;"></span><strong>Quadratic</strong> approximation</span>
+          <span style="display:inline-flex; align-items:center; gap:0.45rem;"><span style="display:inline-block; width:12px; height:12px; background:#ef4444; border-radius:50%;"></span>Expansion point <strong>a</strong></span>
+        </div>
+      </div>
+    </div>
+  `;
+  const mount3D = containerEl.querySelector('[data-role=plot-3d]');
+  const mountOverview = containerEl.querySelector('[data-role=plot-overview]');
+  const live = containerEl.querySelector('[data-role=live]');
+  const el = {
+    ax: containerEl.querySelector('input[data-role=ax]'),
+    ay: containerEl.querySelector('input[data-role=ay]'),
+    zoom: containerEl.querySelector('input[data-role=zoom]'),
+    trueBox: containerEl.querySelector('input[data-role=true]'),
+    linear: containerEl.querySelector('input[data-role=linear]'),
+    quad: containerEl.querySelector('input[data-role=quad]'),
+    axVal: containerEl.querySelector('[data-role=ax-val]'),
+    ayVal: containerEl.querySelector('[data-role=ay-val]'),
+    zoomVal: containerEl.querySelector('[data-role=zoom-val]')
+  };
+
+  let currentCamera = null;
+  let currentCameraOverview = null;
+  let destroyed = false;
+
+  function loadPlotly() {
+    return new Promise((resolve, reject) => {
+      if (window.Plotly) return resolve(window.Plotly);
+      const scriptId = 'plotly-cdn-script';
+      const existing = document.getElementById(scriptId);
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.Plotly));
+        existing.addEventListener('error', reject);
+        return;
+      }
+      const s = document.createElement('script');
+      s.id = scriptId;
+      s.src = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+      s.async = true;
+      s.onload = () => resolve(window.Plotly);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  function evalF(x, y) {
+    try {
+      const expr = state.f.replace(/\^/g, '**').replace(/x/g, `(${x})`).replace(/y/g, `(${y})`);
+      return eval(expr);
+    } catch(e) {
+      return x*x + y*y;
+    }
+  }
+
+  function partialX(x, y, h=1e-3) { return (evalF(x+h, y) - evalF(x-h, y)) / (2*h); }
+  function partialY(x, y, h=1e-3) { return (evalF(x, y+h) - evalF(x, y-h)) / (2*h); }
+  function partialXX(x, y, h=1e-3) { return (evalF(x+h, y) - 2*evalF(x, y) + evalF(x-h, y)) / (h*h); }
+  function partialYY(x, y, h=1e-3) { return (evalF(x, y+h) - 2*evalF(x, y) + evalF(x, y-h)) / (h*h); }
+  function partialXY(x, y, h=1e-3) { return (evalF(x+h, y+h) - evalF(x+h, y-h) - evalF(x-h, y+h) + evalF(x-h, y-h)) / (4*h*h); }
+
+  async function render() {
+    if (destroyed) return;
+    
+    const ax = +el.ax.value;
+    const ay = +el.ay.value;
+    const zoomLevel = Math.max(1, +el.zoom.value); // guard against values below slider min
+    const zoom = 3 / zoomLevel; // radius for zoomed window
+    const showTrue = !!el.trueBox.checked;
+    const showLinear = !!el.linear.checked;
+    const showQuad = !!el.quad.checked;
+
+    el.axVal.textContent = ax.toFixed(1);
+    el.ayVal.textContent = ay.toFixed(1);
+    el.zoomVal.textContent = `${zoomLevel}x`;
+
+    const Plotly = await loadPlotly();
+    if (destroyed || !Plotly) return;
+
+    // Zoom creates viewing window centered on (ax, ay)
+    const bounds = zoom;
+    // Adaptive mesh: higher resolution when radius is large so curvature remains visible
+    const res = Math.max(30, Math.min(90, Math.round(8 * bounds)));
+
+    // Compute Taylor coefficients at point a
+    const fa = evalF(ax, ay);
+    const px = partialX(ax, ay);
+    const py = partialY(ax, ay);
+    const fxx = partialXX(ax, ay);
+    const fyy = partialYY(ax, ay);
+    const fxy = partialXY(ax, ay);
+
+    // Generate grid centered on (ax, ay)
+    const xRange = [];
+    const yRange = [];
+    for (let i = 0; i <= res; i++) {
+      xRange.push(ax - bounds + (i * 2 * bounds) / res);
+      yRange.push(ay - bounds + (i * 2 * bounds) / res);
+    }
+
+    // Generate surfaces
+    const zTrue = [];
+    const zLinear = [];
+    const zQuad = [];
+
+    for (let i = 0; i <= res; i++) {
+      const rowTrue = [];
+      const rowLinear = [];
+      const rowQuad = [];
+      
+      for (let j = 0; j <= res; j++) {
+        const x = xRange[j];
+        const y = yRange[i];
+        const dx = x - ax;
+        const dy = y - ay;
+
+        rowTrue.push(evalF(x, y));
+        rowLinear.push(fa + px * dx + py * dy);
+        rowQuad.push(fa + px * dx + py * dy + 0.5 * (fxx * dx * dx + 2 * fxy * dx * dy + fyy * dy * dy));
+      }
+      
+      zTrue.push(rowTrue);
+      zLinear.push(rowLinear);
+      zQuad.push(rowQuad);
+    }
+
+    const traces = [];
+
+    // True function surface
+    if (showTrue) {
+      traces.push({
+        type: 'surface',
+        x: xRange,
+        y: yRange,
+        z: zTrue,
+        colorscale: [[0, '#e0e7ff'], [1, '#6366f1']],
+        showscale: false,
+        opacity: 0.8,
+        name: 'True f(x,y)',
+        hovertemplate: 'x: %{x:.2f}<br>y: %{y:.2f}<br>f: %{z:.2f}<extra>True</extra>'
+      });
+    }
+
+    // Linear approximation (tangent plane)
+    if (showLinear) {
+      traces.push({
+        type: 'surface',
+        x: xRange,
+        y: yRange,
+        z: zLinear,
+        colorscale: [[0, '#fed7aa'], [1, '#f97316']],
+        showscale: false,
+        opacity: 0.7,
+        name: 'Linear approx',
+        hovertemplate: 'x: %{x:.2f}<br>y: %{y:.2f}<br>Linear: %{z:.2f}<extra>Linear</extra>'
+      });
+    }
+
+    // Quadratic approximation
+    if (showQuad) {
+      traces.push({
+        type: 'surface',
+        x: xRange,
+        y: yRange,
+        z: zQuad,
+        colorscale: [[0, '#bbf7d0'], [1, '#22c55e']],
+        showscale: false,
+        opacity: 0.7,
+        name: 'Quadratic approx',
+        hovertemplate: 'x: %{x:.2f}<br>y: %{y:.2f}<br>Quadratic: %{z:.2f}<extra>Quadratic</extra>'
+      });
+    }
+
+    // Expansion point marker
+    traces.push({
+      type: 'scatter3d',
+      mode: 'markers',
+      x: [ax],
+      y: [ay],
+      z: [fa],
+      marker: {
+        size: 10,
+        color: '#ef4444',
+        symbol: 'circle',
+        line: { color: '#991b1b', width: 2 }
+      },
+      name: 'Point a',
+      hovertemplate: 'a = (%{x:.2f}, %{y:.2f})<br>f(a) = %{z:.2f}<extra>Expansion point</extra>'
+    });
+
+    const layout = {
+      autosize: true,
+      margin: { l: 0, r: 0, t: 30, b: 0 },
+      scene: {
+        camera: currentCamera || {
+          eye: { x: 1.5, y: 1.5, z: 1.3 },
+          center: { x: 0, y: 0, z: 0 }
+        },
+        xaxis: { title: 'x', range: [ax - bounds, ax + bounds], gridcolor: '#cbd5e1' },
+        yaxis: { title: 'y', range: [ay - bounds, ay + bounds], gridcolor: '#cbd5e1' },
+        zaxis: { title: 'z = f(x,y)', gridcolor: '#cbd5e1' },
+        aspectmode: 'cube'
+      },
+      showlegend: false,
+      paper_bgcolor: 'transparent',
+      plot_bgcolor: 'transparent'
+    };
+
+    const config = {
+      responsive: true,
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['toImage', 'sendDataToCloud', 'select2d', 'lasso2d'],
+      displaylogo: false
+    };
+
+    if (mount3D) {
+      try {
+        await Plotly.react(mount3D, traces, layout, config);
+        
+        if (!mount3D.__relayoutListenerAdded) {
+          mount3D.on('plotly_relayout', (eventdata) => {
+            if (eventdata['scene.camera']) {
+              currentCamera = eventdata['scene.camera'];
+            }
+          });
+          mount3D.__relayoutListenerAdded = true;
+        }
+      } catch (e) {
+        console.error('Plotly render error:', e);
+      }
+    }
+
+    if (mountOverview) {
+      try {
+        const overviewBounds = 2.5;
+        const overviewRes = 25;
+        const xRangeOverview = [];
+        const yRangeOverview = [];
+        for (let i = 0; i <= overviewRes; i++) {
+          xRangeOverview.push(-overviewBounds + (i * 2 * overviewBounds) / overviewRes);
+          yRangeOverview.push(-overviewBounds + (i * 2 * overviewBounds) / overviewRes);
+        }
+
+        const zTrueOverview = [];
+        for (let i = 0; i <= overviewRes; i++) {
+          const row = [];
+          for (let j = 0; j <= overviewRes; j++) {
+            row.push(evalF(xRangeOverview[j], yRangeOverview[i]));
+          }
+          zTrueOverview.push(row);
+        }
+
+        const tracesOverview = [
+          {
+            type: 'surface',
+            x: xRangeOverview,
+            y: yRangeOverview,
+            z: zTrueOverview,
+            colorscale: [[0, '#e0e7ff'], [1, '#6366f1']],
+            showscale: false,
+            opacity: 0.7,
+            hovertemplate: 'x: %{x:.2f}<br>y: %{y:.2f}<br>f: %{z:.2f}<extra>True</extra>'
+          },
+          {
+            type: 'scatter3d',
+            mode: 'markers',
+            x: [ax],
+            y: [ay],
+            z: [fa],
+            marker: { size: 8, color: '#ef4444', symbol: 'circle', line: { color: '#991b1b', width: 2 } },
+            hovertemplate: 'a = (%{x:.2f}, %{y:.2f})<br>f(a) = %{z:.2f}<extra>Point a</extra>'
+          }
+        ];
+
+        const circlePts = { x: [], y: [], z: [] };
+        for (let i = 0; i <= 100; i++) {
+          const ang = (i / 100) * 2 * Math.PI;
+          circlePts.x.push(ax + zoom * Math.cos(ang));
+          circlePts.y.push(ay + zoom * Math.sin(ang));
+          circlePts.z.push(0);
+        }
+        tracesOverview.push({
+          type: 'scatter3d',
+          mode: 'lines',
+          x: circlePts.x,
+          y: circlePts.y,
+          z: circlePts.z,
+          line: { color: '#22c55e', width: 4 },
+          hovertemplate: 'Zoom radius<extra></extra>'
+        });
+
+        const layoutOverview = {
+          autosize: true,
+          margin: { l: 0, r: 0, t: 5, b: 0 },
+          scene: {
+            camera: currentCameraOverview || { eye: { x: 1.5, y: 1.5, z: 1.3 }, center: { x: 0, y: 0, z: 0 } },
+            xaxis: { title: 'x', range: [-overviewBounds, overviewBounds], gridcolor: '#cbd5e1' },
+            yaxis: { title: 'y', range: [-overviewBounds, overviewBounds], gridcolor: '#cbd5e1' },
+            zaxis: { title: 'z', gridcolor: '#cbd5e1' },
+            aspectmode: 'cube'
+          },
+          showlegend: false,
+          paper_bgcolor: 'transparent',
+          plot_bgcolor: 'transparent'
+        };
+
+        await Plotly.react(mountOverview, tracesOverview, layoutOverview, config);
+
+        if (!mountOverview.__relayoutListenerAdded) {
+          mountOverview.on('plotly_relayout', (eventdata) => {
+            if (eventdata['scene.camera']) {
+              currentCameraOverview = eventdata['scene.camera'];
+            }
+          });
+          mountOverview.__relayoutListenerAdded = true;
+        }
+      } catch (e) {
+        console.error('Plotly overview render error:', e);
+      }
+    }
+
+    if (live) {
+      const parts = [];
+      if (showTrue) parts.push('true');
+      if (showLinear) parts.push('linear');
+      if (showQuad) parts.push('quadratic');
+      const zoomMsg = (zoomLevel > 8)
+        ? ' — Very zoomed in! Approximations nearly perfect.'
+        : (zoomLevel > 5)
+          ? ' — Zoomed in, good fit.'
+          : (zoomLevel > 2)
+            ? ' — Medium zoom.'
+            : ' — Zoomed out, approximations diverge.';
+      live.textContent = `Showing ${parts.join(', ')} at a=(${ax.toFixed(1)}, ${ay.toFixed(1)}), f(a)=${fa.toFixed(2)}. Zoom: ${zoomLevel.toFixed(1)}x, radius=${zoom.toFixed(2)}${zoomMsg}`;
+    }
+  }
+
+  loadPlotly()
+    .then(() => {
+      if (!destroyed) {
+        Object.values(el).filter(e => e?.addEventListener).forEach(inp => 
+          inp.addEventListener('input', render)
+        );
+        render();
+      }
+    })
+    .catch(() => {
+      if (mount3D) {
+        mount3D.innerHTML = '<div style="padding:2rem; text-align:center; color: var(--text-secondary);">Failed to load Plotly. Please check your connection.</div>';
+      }
+    });
+
+  return {
+    destroy() {
+      destroyed = true;
+      try {
+        Object.values(el).filter(e => e?.removeEventListener).forEach(inp => 
+          inp.removeEventListener('input', render)
+        );
+      } catch(_){ }
+      try {
+        if (mount3D && window.Plotly) window.Plotly.purge(mount3D);
+        if (mountOverview && window.Plotly) window.Plotly.purge(mountOverview);
+      } catch(_){ }
+      try { containerEl.innerHTML = ''; } catch(_){ }
+    }
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch5_taylor_surfaces_3d'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch5_taylor_surfaces_3d');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch5_taylor_surfaces_3d', e);
+    }
+  })();
+
   // ch6_unconstrained_foc_plot.js
   (function(){
     // Chapter 6: Unconstrained Optimization — FOC Illustration (Observable Plot)
