@@ -1212,15 +1212,22 @@ this.currentChapter = chapterIndex;
                         'ch4_axb_column_space': 'ch4_axb_column_space',
                         'ch4_det_area_scaling': 'ch4_det_area_scaling',
                         'ch4_quadratic_form_classifier': 'ch4_quadratic_form_classifier',
-                        'ch4_stability_dynamics': 'ch4_stability_dynamics'
+                        'ch4_stability_dynamics': 'ch4_stability_dynamics',
+                        // Chapter 5: route wrapper IDs to concrete 3D implementations in frozen build
+                        'ch5_partials_cross_sections': 'ch5_partials_surface_tangents_3d',
+                        'ch5_partials_surface_tangents_3d': 'ch5_partials_surface_tangents_3d',
+                        'ch5_gradient_levelset_normal': 'ch5_gradient_surface_3d',
+                        'ch5_gradient_surface_3d': 'ch5_gradient_surface_3d',
+                        'ch5_taylor_surfaces_3d': 'ch5_taylor_surfaces_3d'
                     };
-                    const key = (window.__ANIMS__[id]) ? id : (alias[id] || null);
-                    if (key && window.__ANIMS__[key] && typeof window.__ANIMS__[key].init === 'function') {
-                        const inst = window.__ANIMS__[key].init(el, options) || { destroy() {} };
+                    // Prefer alias if defined to avoid wrapper modules that try dynamic import in frozen builds
+                    const mappedId = alias[id] || id;
+                    if (window.__ANIMS__[mappedId] && typeof window.__ANIMS__[mappedId].init === 'function') {
+                        const inst = window.__ANIMS__[mappedId].init(el, options) || { destroy() {} };
                         this.activeAnimInstances.push(inst);
                         continue; // handled via bundled registry
                     } else {
-                        console.info('Animation not found in frozen bundle:', id);
+                        console.info('Animation not found in frozen bundle:', id, 'mapped to:', mappedId);
                         continue;
                     }
                 }
@@ -1255,6 +1262,29 @@ this.currentChapter = chapterIndex;
                     case 'ch6_unconstrained_foc_plot':
                         // Dynamic import removed for static build
                         break;
+                    // Chapter 6 interactive figures
+                    case 'ch6_convex_set_chord_test':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch6_function_concavity_chord':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch6_epigraph_hypograph':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch6_hessian_taylor_classifier':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch6_profit_unconstrained':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch6_global_vs_local':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch6_coercivity_superlevelsets':
+                        // Dynamic import removed for static build
+                        break;
+                    // Chapter 7 interactive figures
                     case 'ch7_kkt_consumer_inequality':
                         // Dynamic import removed for static build
                         break;
@@ -1273,6 +1303,32 @@ this.currentChapter = chapterIndex;
                         // Dynamic import removed for static build
                         break;
                     case 'ch4_stability_dynamics':
+                        // Dynamic import removed for static build
+                        break;
+                    // Chapter 5 interactive figures
+                    case 'ch5_partials_cross_sections':
+                    case 'ch5_partials_surface_tangents_3d':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch5_gradient_levelset_normal':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch5_directional_derivative_dot':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch5_jacobian_local_linear':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch5_chain_rule_blocks':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch5_hessian_classifier_tripanel':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch5_taylor_overlays':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch5_taylor_surfaces_3d':
                         // Dynamic import removed for static build
                         break;
                     default:
