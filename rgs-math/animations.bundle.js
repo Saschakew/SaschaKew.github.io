@@ -8112,28 +8112,38 @@ function init(container, options = {}) {
         vertices.push({ x: xInt, y: yInt, name: 'g1∩g2' });
       }
 
-      // Solve optimization
-      let optimal = { x: 0, y: 0, U: 0, activeSet: [] };
+      // Solve optimization: check all vertices and find best
+      let optimal = null;
+      let maxU = -Infinity;
       
-      // Check all vertices and find best
       for (const v of vertices) {
-        const feasible = v.x >= 0 && v.y >= 0 && 
-                        (2*v.x + 3*v.y <= c1 + 0.01) && 
-                        (v.x + v.y <= c2 + 0.01);
+        // Check feasibility with tolerance
+        const g1 = 2*v.x + 3*v.y;
+        const g2 = v.x + v.y;
+        const feasible = v.x >= -0.01 && v.y >= -0.01 && 
+                        g1 <= c1 + 0.01 && 
+                        g2 <= c2 + 0.01;
+        
         if (feasible) {
-          const U = Math.sqrt(v.x * v.y);
-          if (U > optimal.U) {
-            optimal = { ...v, U };
+          const U = (v.x > 0 && v.y > 0) ? Math.sqrt(v.x * v.y) : 0;
+          if (U > maxU) {
+            maxU = U;
             
             // Determine active set
             const activeSet = [];
-            if (Math.abs(2*v.x + 3*v.y - c1) < 0.5) activeSet.push('g₁');
-            if (Math.abs(v.x + v.y - c2) < 0.5) activeSet.push('g₂');
+            if (Math.abs(g1 - c1) < 0.5) activeSet.push('g₁');
+            if (Math.abs(g2 - c2) < 0.5) activeSet.push('g₂');
             if (v.x < 0.5) activeSet.push('x≥0');
             if (v.y < 0.5) activeSet.push('y≥0');
-            optimal.activeSet = activeSet;
+            
+            optimal = { x: Math.max(0, v.x), y: Math.max(0, v.y), U, activeSet, name: v.name };
           }
         }
+      }
+      
+      // Fallback if no feasible vertex found (shouldn't happen but safety)
+      if (!optimal) {
+        optimal = { x: 0, y: 0, U: 0, activeSet: ['x≥0', 'y≥0'], name: 'origin' };
       }
 
       // Generate constraint lines
@@ -8151,15 +8161,31 @@ function init(container, options = {}) {
 
       // Utility contours
       const contours = [];
-      for (let factor of [0.3, 0.6, 0.9, 1.0]) {
-        const level = factor * optimal.U;
-        if (level > 0) {
+      if (optimal.U > 0.01) {
+        for (let factor of [0.3, 0.6, 0.9, 1.0]) {
+          const level = factor * optimal.U;
+          if (level > 0.01) {
+            const contour = Array.from({ length: 100 }, (_, i) => {
+              const x = 0.5 + (i / 99) * Math.max(c1/2, c2);
+              const y = (level * level) / x;
+              return { x, y };
+            }).filter(p => p.y >= 0 && p.y <= Math.max(c1/3, c2));
+            if (contour.length > 0) {
+              contours.push(contour);
+            }
+          }
+        }
+      } else {
+        // If optimum is at (0,0) or very low, show some default contours
+        for (let level of [1, 2, 3, 5]) {
           const contour = Array.from({ length: 100 }, (_, i) => {
             const x = 0.5 + (i / 99) * Math.max(c1/2, c2);
             const y = (level * level) / x;
             return { x, y };
           }).filter(p => p.y >= 0 && p.y <= Math.max(c1/3, c2));
-          contours.push(contour);
+          if (contour.length > 0) {
+            contours.push(contour);
+          }
         }
       }
 
@@ -8658,6 +8684,340 @@ function init(container, options = {}) {
       }
     } catch (e) {
       console.error('Failed to register animation ch7_complementary_slackness', e);
+    }
+  })();
+
+  // ch7_complementary_slackness_3d.js
+  (function(){
+    // Chapter 7: Complementary Slackness Explorer with 3D Utility Surface
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+  const state = {
+    income: options.income || 100,
+    utilityType: options.utilityType || 'monotone',
+    showKKT: options.showKKT !== false,
+    width: 900,
+    height: 500,
+    camera: null // Store camera state
+  };
+
+  const controls = document.createElement('div');
+  controls.className = 'animation-controls';
+  controls.innerHTML = `
+    <label>Income I: <input type="range" id="income-slider" min="30" max="150" value="${state.income}" step="5"></label>
+    <span id="income-value">${state.income}</span>
+    <label><input type="radio" name="utility" value="monotone" ${state.utilityType === 'monotone' ? 'checked' : ''}> Monotone U(x,y)=√(xy)</label>
+    <label><input type="radio" name="utility" value="bliss" ${state.utilityType === 'bliss' ? 'checked' : ''}> Bliss U(x,y)=-[(x-10)²+(y-10)²]</label>
+    <label><input type="checkbox" id="show-kkt" ${state.showKKT ? 'checked' : ''}> Show KKT conditions</label>
+  `;
+
+  const canvas = document.createElement('div');
+  canvas.id = 'slackness-3d-container';
+  canvas.style.display = 'flex';
+  canvas.style.gap = '20px';
+
+  const infoDiv = document.createElement('div');
+  infoDiv.id = 'slackness-info';
+  infoDiv.style.marginTop = '10px';
+  infoDiv.style.padding = '10px';
+  infoDiv.style.background = '#f5f5f5';
+  infoDiv.style.borderRadius = '4px';
+
+  container.appendChild(controls);
+  container.appendChild(canvas);
+  container.appendChild(infoDiv);
+
+  // Load Plotly
+  function loadPlotly() {
+    return new Promise((resolve, reject) => {
+      if (window.Plotly) return resolve(window.Plotly);
+      const scriptId = 'plotly-cdn-script';
+      const existing = document.getElementById(scriptId);
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.Plotly));
+        existing.addEventListener('error', reject);
+        return;
+      }
+      const s = document.createElement('script');
+      s.id = scriptId;
+      s.src = 'https://cdn.plot.ly/plotly-2.27.0.min.js';
+      s.async = true;
+      s.onload = () => resolve(window.Plotly);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  const render = async () => {
+    const I = state.income;
+    const prices = [2, 3];
+    
+    // Compute optimum
+    let optimal;
+    if (state.utilityType === 'monotone') {
+      const x = I / 4;
+      const y = I / 6;
+      const lambda = 0.5 * Math.sqrt(y/x) / prices[0];
+      optimal = { x, y, lambda, binding: true, U: Math.sqrt(x * y) };
+    } else {
+      const blissX = 10, blissY = 10;
+      const spent = prices[0] * blissX + prices[1] * blissY;
+      if (spent <= I) {
+        optimal = { x: blissX, y: blissY, lambda: 0, binding: false, U: 0 };
+      } else {
+        const x = I / 4;
+        const y = I / 6;
+        optimal = { x, y, lambda: 0.1, binding: true, U: -((x - blissX)**2 + (y - blissY)**2) };
+      }
+    }
+
+    const xMax = I / prices[0];
+    const yMax = I / prices[1];
+
+    try {
+      const Plotly = await loadPlotly();
+
+      // 3D Surface
+      const xGrid = Array.from({ length: 40 }, (_, i) => (i / 39) * xMax * 1.2);
+      const yGrid = Array.from({ length: 40 }, (_, i) => (i / 39) * yMax * 1.2);
+      const zGrid = [];
+
+      for (let i = 0; i < yGrid.length; i++) {
+        const row = [];
+        for (let j = 0; j < xGrid.length; j++) {
+          const x = xGrid[j];
+          const y = yGrid[i];
+          let z;
+          if (state.utilityType === 'monotone') {
+            z = x > 0 && y > 0 ? Math.sqrt(x * y) : 0;
+          } else {
+            z = -((x - 10)**2 + (y - 10)**2);
+          }
+          row.push(z);
+        }
+        zGrid.push(row);
+      }
+
+      // Budget constraint plane
+      const budgetX = [0, xMax, xMax, 0];
+      const budgetY = [yMax, 0, 0, yMax];
+      const budgetZ = budgetX.map((x, idx) => {
+        const y = budgetY[idx];
+        if (state.utilityType === 'monotone') {
+          return x > 0 && y > 0 ? Math.sqrt(x * y) : 0;
+        } else {
+          return -((x - 10)**2 + (y - 10)**2);
+        }
+      });
+
+      const plot3D = document.createElement('div');
+      plot3D.style.width = '480px';
+      plot3D.style.height = '420px';
+      plot3D.style.flexShrink = '0';
+      plot3D.style.maxWidth = '480px';
+      plot3D.style.overflow = 'hidden';
+
+      // Feasible region mesh (triangle on x-y plane)
+      const feasibleZ = 0; // Base of the plot
+      
+      const traces3D = [
+        {
+          type: 'surface',
+          x: xGrid,
+          y: yGrid,
+          z: zGrid,
+          colorscale: 'Viridis',
+          opacity: 0.8,
+          name: 'Utility U(x,y)',
+          showscale: false
+        },
+        {
+          type: 'mesh3d',
+          x: [0, xMax, 0],
+          y: [0, 0, yMax],
+          z: [feasibleZ, feasibleZ, feasibleZ],
+          i: [0],
+          j: [1],
+          k: [2],
+          color: 'lightblue',
+          opacity: 0.3,
+          name: 'Feasible region',
+          hoverinfo: 'skip'
+        },
+        {
+          type: 'scatter3d',
+          mode: 'lines',
+          x: [0, xMax],
+          y: [yMax, 0],
+          z: [0, xMax, xMax, 0].map((x, idx) => {
+            const y = [yMax, 0, 0, yMax][idx];
+            if (state.utilityType === 'monotone') {
+              return x > 0 && y > 0 ? Math.sqrt(x * y) : 0;
+            } else {
+              return -((x - 10)**2 + (y - 10)**2);
+            }
+          }).slice(0, 2),
+          line: { color: 'blue', width: 5 },
+          name: `Budget: 2x+3y=${I}`
+        },
+        {
+          type: 'scatter3d',
+          mode: 'markers',
+          x: [optimal.x],
+          y: [optimal.y],
+          z: [optimal.U],
+          marker: { size: 10, color: 'red', symbol: 'diamond' },
+          name: 'Optimum ★'
+        }
+      ];
+
+      const layout3D = {
+        scene: {
+          xaxis: { title: 'Good x' },
+          yaxis: { title: 'Good y' },
+          zaxis: { title: 'Utility U' },
+          camera: state.camera || { eye: { x: 1.5, y: 1.5, z: 1.3 } }
+        },
+        margin: { l: 0, r: 0, t: 30, b: 0 },
+        title: '3D: Utility Surface & Budget Constraint',
+        width: 480,
+        height: 420,
+        showlegend: true,
+        legend: { x: 0, y: 1, xanchor: 'left', yanchor: 'top' }
+      };
+
+      Plotly.newPlot(plot3D, traces3D, layout3D, { responsive: false, displayModeBar: false });
+      
+      // Capture camera changes
+      plot3D.on('plotly_relayout', (eventData) => {
+        if (eventData['scene.camera']) {
+          state.camera = eventData['scene.camera'];
+        }
+      });
+
+      // 2D Contour plot
+      const plot2D = document.createElement('div');
+      plot2D.style.width = '420px';
+      plot2D.style.height = '420px';
+      plot2D.style.flexShrink = '0';
+
+      const budgetLine = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * xMax;
+        const y = (I - prices[0] * x) / prices[1];
+        return { x, y };
+      });
+
+      const contours = [];
+      if (state.utilityType === 'monotone') {
+        for (let factor of [0.3, 0.6, 0.9, 1.0]) {
+          const level = factor * optimal.U;
+          if (level > 0) {
+            const contour = Array.from({ length: 100 }, (_, i) => {
+              const x = 0.1 + (i / 99) * xMax;
+              const y = (level * level) / x;
+              return { x, y };
+            }).filter(p => p.y >= 0 && p.y <= yMax * 1.2);
+            contours.push(contour);
+          }
+        }
+      } else {
+        for (let r of [2, 5, 8, 12]) {
+          const contour = Array.from({ length: 100 }, (_, i) => {
+            const angle = (i / 99) * 2 * Math.PI;
+            const x = 10 + r * Math.cos(angle);
+            const y = 10 + r * Math.sin(angle);
+            return { x, y };
+          }).filter(p => p.x >= 0 && p.y >= 0);
+          contours.push(contour);
+        }
+      }
+
+      const marks = [
+        Plot.areaY(budgetLine, { x: "x", y: "y", fill: "#b3d9ff", opacity: 0.5 }),
+        Plot.line(budgetLine, { x: "x", y: "y", stroke: "blue", strokeWidth: 2 }),
+        ...contours.map((c, i) => 
+          Plot.line(c, { x: "x", y: "y", stroke: "green", strokeWidth: 1, opacity: 0.6 })
+        ),
+        Plot.dot([optimal], { x: "x", y: "y", r: 6, fill: "red" }),
+        Plot.text([optimal], { 
+          x: "x", 
+          y: "y", 
+          text: () => `★ (${optimal.x.toFixed(1)}, ${optimal.y.toFixed(1)})`,
+          dy: -15,
+          fontWeight: 'bold'
+        })
+      ];
+
+      const plot2DObservable = Plot.plot({
+        width: 420,
+        height: 420,
+        marginLeft: 60,
+        x: { domain: [0, xMax * 1.1], label: "Good x" },
+        y: { domain: [0, yMax * 1.1], label: "Good y" },
+        marks
+      });
+
+      canvas.innerHTML = '';
+      const panel3D = document.createElement('div');
+      panel3D.appendChild(plot3D);
+      
+      const panel2D = document.createElement('div');
+      panel2D.appendChild(plot2DObservable);
+      
+      canvas.appendChild(panel3D);
+      canvas.appendChild(panel2D);
+
+      // Update info
+      if (state.showKKT) {
+        infoDiv.innerHTML = `
+          <strong>KKT Status:</strong><br>
+          λ = ${optimal.lambda.toFixed(4)} ${optimal.lambda > 0.001 ? '> 0' : '= 0'}<br>
+          Budget constraint: ${optimal.binding ? '<strong>BINDING</strong>' : '<strong>SLACK</strong>'}<br>
+          Complementary slackness: λ(2x+3y-${I}) = ${(optimal.lambda * (prices[0]*optimal.x + prices[1]*optimal.y - I)).toFixed(4)} ✓<br>
+          <em>3D view shows utility surface with budget constraint cutting through it. Red diamond marks the tangency point.</em>
+        `;
+      } else {
+        infoDiv.innerHTML = `<strong>${optimal.binding ? 'Budget binds (λ > 0)' : 'Budget slack (λ = 0)'}</strong><br><em>3D view shows the constrained optimum at the tangency.</em>`;
+      }
+
+    } catch (e) {
+      console.error('Plotly error:', e);
+      canvas.innerHTML = '<p style="color: red;">Failed to load 3D visualization. Plotly required.</p>';
+    }
+  };
+
+  // Event listeners
+  controls.querySelector('#income-slider').addEventListener('input', (e) => {
+    state.income = parseFloat(e.target.value);
+    controls.querySelector('#income-value').textContent = state.income;
+    render();
+  });
+
+  controls.querySelectorAll('input[name="utility"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      state.utilityType = e.target.value;
+      render();
+    });
+  });
+
+  controls.querySelector('#show-kkt').addEventListener('change', (e) => {
+    state.showKKT = e.target.checked;
+    render();
+  });
+
+  render();
+  return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_complementary_slackness_3d'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_complementary_slackness_3d');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_complementary_slackness_3d', e);
     }
   })();
 
@@ -10121,8 +10481,16 @@ function init(container, options = {}) {
     canvas.style.display = 'flex';
     canvas.style.gap = '20px';
 
+    const infoDiv = document.createElement('div');
+    infoDiv.id = 'shadow-price-info';
+    infoDiv.style.marginTop = '10px';
+    infoDiv.style.padding = '10px';
+    infoDiv.style.background = '#f5f5f5';
+    infoDiv.style.borderRadius = '4px';
+
     container.appendChild(controls);
     container.appendChild(canvas);
+    container.appendChild(infoDiv);
 
     // Utility function: U(x,y) = sqrt(xy)
     // Budget: 2x + 3y = I
@@ -10151,6 +10519,20 @@ function init(container, options = {}) {
         return { x, y };
       });
 
+      // Utility contours to show the optimum is at tangency
+      const contours = [];
+      for (let factor of [0.5, 0.8, 1.0]) {
+        const level = factor * current.U;
+        if (level > 0) {
+          const contour = Array.from({ length: 100 }, (_, i) => {
+            const x = 0.5 + (i / 99) * (I / 2);
+            const y = (level * level) / x;
+            return { x, y };
+          }).filter(p => p.y >= 0 && p.y <= I/3 * 1.3);
+          contours.push(contour);
+        }
+      }
+
       const plotA = Plot.plot({
         width: 350,
         height: 350,
@@ -10158,20 +10540,38 @@ function init(container, options = {}) {
         x: { domain: [0, I/2 * 1.2], label: "x" },
         y: { domain: [0, I/3 * 1.2], label: "y" },
         marks: [
-          Plot.line(budgetData, { x: "x", y: "y", stroke: "blue", strokeWidth: 2 }),
-          Plot.dot([current], { x: "x", y: "y", r: 6, fill: "red" }),
+          // Utility contours
+          ...contours.map((c, idx) => 
+            Plot.line(c, { 
+              x: "x", 
+              y: "y", 
+              stroke: idx === contours.length - 1 ? "#00AA00" : "#90EE90", 
+              strokeWidth: idx === contours.length - 1 ? 2 : 1,
+              opacity: 0.7
+            })
+          ),
+          Plot.line(budgetData, { x: "x", y: "y", stroke: "blue", strokeWidth: 2.5 }),
+          Plot.dot([current], { x: "x", y: "y", r: 8, fill: "red" }),
           Plot.text([current], { 
             x: "x", 
             y: "y", 
-            text: () => `(${current.x.toFixed(1)}, ${current.y.toFixed(1)})`,
-            dy: -12
+            text: () => `★ (${current.x.toFixed(1)}, ${current.y.toFixed(1)})`,
+            dy: -15,
+            fontWeight: "bold"
           }),
-          Plot.text([{x: I/4, y: 0}], { 
+          Plot.text([{x: I/4, y: I/3 * 1.05}], { 
             x: "x", 
             y: "y", 
             text: () => `Budget: 2x+3y=${I}`,
-            dy: -10,
+            fill: "blue",
             fontSize: 11
+          }),
+          Plot.text([{x: I/2 * 0.7, y: (current.U * current.U) / (I/2 * 0.7) + 2}], { 
+            x: "x", 
+            y: "y", 
+            text: "Utility contours",
+            fill: "#00AA00",
+            fontSize: 10
           })
         ]
       });
@@ -10196,20 +10596,36 @@ function init(container, options = {}) {
 
       if (state.showLambda) {
         marks.push(
-          Plot.line(tangentData, { x: "income", y: "value", stroke: "orange", strokeWidth: 2, strokeDasharray: "4" }),
-          Plot.text([{ income: I + 15, value: current.U + current.lambda * 15 }], {
+          Plot.line(tangentData, { x: "income", y: "value", stroke: "orange", strokeWidth: 3, strokeDasharray: "5,3" }),
+          Plot.text([{ income: I + 18, value: current.U + current.lambda * 18 }], {
             x: "income",
             y: "value",
-            text: () => `slope = λ = ${current.lambda.toFixed(4)}`,
-            fontSize: 11
+            text: () => `Tangent: slope = λ = ${current.lambda.toFixed(4)}`,
+            fontSize: 12,
+            fill: "orange",
+            fontWeight: "bold"
           })
         );
       }
 
       if (state.showDelta) {
+        const midY = (current.U + next.U) / 2;
         marks.push(
-          Plot.dot([{ income: I + state.deltaI, value: next.U }], { x: "income", y: "value", r: 5, fill: "purple" }),
-          Plot.ruleY([current.U, next.U], { x: I + state.deltaI, stroke: "purple", strokeDasharray: "2" })
+          Plot.dot([{ income: I + state.deltaI, value: next.U }], { x: "income", y: "value", r: 7, fill: "purple", stroke: "white", strokeWidth: 2 }),
+          Plot.link([{ x1: I + state.deltaI, y1: current.U, x2: I + state.deltaI, y2: next.U }], {
+            x1: "x1", y1: "y1", x2: "x2", y2: "y2",
+            stroke: "purple",
+            strokeWidth: 3,
+            markerEnd: "arrow"
+          }),
+          Plot.text([{ income: I + state.deltaI + 5, value: midY }], {
+            x: "income",
+            y: "value",
+            text: () => `ΔV = ${deltaV.toFixed(4)}`,
+            fill: "purple",
+            fontSize: 12,
+            fontWeight: "bold"
+          })
         );
       }
 
@@ -10222,23 +10638,19 @@ function init(container, options = {}) {
         marks
       });
 
-      const info = document.createElement('div');
-      info.style.marginTop = '10px';
-      info.style.padding = '10px';
-      info.style.background = '#f5f5f5';
-      info.style.borderRadius = '4px';
-      
-      info.innerHTML = `
-        <strong>Envelope Identity Check:</strong><br>
-        λ* = ${current.lambda.toFixed(4)} (shadow price of income)<br>
-        ${state.showDelta ? `Actual ΔV = ${deltaV.toFixed(4)}<br>` : ''}
-        ${state.showDelta ? `Predicted λ·ΔI = ${approxDeltaV.toFixed(4)}<br>` : ''}
-        ${state.showDelta ? `<strong>Match: ${Math.abs(deltaV - approxDeltaV) < 0.001 ? '✓' : '~'}</strong>` : ''}
+      // Update info div (don't create new one)
+      infoDiv.innerHTML = `
+        <strong>Envelope Identity:</strong> dV/dI = λ at the optimum<br>
+        <strong>λ* = ${current.lambda.toFixed(4)}</strong> (marginal utility of income)<br>
+        ${state.showDelta ? `<span style="color: purple;">Actual ΔV = ${deltaV.toFixed(4)}</span><br>` : ''}
+        ${state.showDelta ? `<span style="color: orange;">Predicted λ·ΔI = ${approxDeltaV.toFixed(4)}</span><br>` : ''}
+        ${state.showDelta ? `<strong style="color: green;">Match: ${Math.abs(deltaV - approxDeltaV) < 0.001 ? '✓ Perfect!' : '≈ Close'}</strong>` : ''}
+        ${!state.showDelta && !state.showLambda ? '<em>Toggle checkboxes above to see λ slope and ΔV verification</em>' : ''}
       `;
 
       canvas.innerHTML = '';
       const panelA = document.createElement('div');
-      panelA.innerHTML = '<h4 style="margin: 5px 0;">Consumer Problem</h4>';
+      panelA.innerHTML = '<h4 style="margin: 5px 0;">Consumer Problem at I=' + I + '</h4>';
       panelA.appendChild(plotA);
       
       const panelB = document.createElement('div');
@@ -10247,7 +10659,6 @@ function init(container, options = {}) {
       
       canvas.appendChild(panelA);
       canvas.appendChild(panelB);
-      container.appendChild(info);
     };
 
     controls.querySelector('#income-slider').addEventListener('input', (e) => {
