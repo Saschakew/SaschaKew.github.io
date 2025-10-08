@@ -1220,7 +1220,7 @@ this.currentChapter = chapterIndex;
                         'ch5_gradient_surface_3d': 'ch5_gradient_surface_3d',
                         'ch5_taylor_surfaces_3d': 'ch5_taylor_surfaces_3d',
                         // Chapter 7 new modules
-                        'ch7_complementary_slackness': 'ch7_complementary_slackness',
+                        'ch7_complementary_slackness': 'ch7_complementary_slackness_3d',
                         'ch7_shadow_price': 'ch7_shadow_price',
                         'ch7_active_set': 'ch7_active_set',
                         'ch7_bliss_point': 'ch7_bliss_point',
