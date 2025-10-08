@@ -10951,6 +10951,585 @@ function init(container, options = {}) {
     }
   })();
 
+  // ch8_envelope_tangent_check.js
+  (function(){
+    // Chapter 8: Envelope Theorem — Interactive Dual-Panel Explorer
+// Public API: export function init(container, options)
+// User controls income I with slider; see synchronized budget/value panels with λ* tangent.
+
+function init(container, options = {}) {
+  // Config
+  const cfg = {
+    Imin: options.Imin ?? 70,
+    Imax: options.Imax ?? 130,
+    widthLeft: options.widthLeft ?? 380,
+    widthRight: options.widthRight ?? 420,
+    height: options.height ?? 320,
+    themeBg: getComputedStyle(document.documentElement).getPropertyValue('--bg-tertiary')?.trim() || '#f5f5f5'
+  };
+
+  // State
+  const state = {
+    I: options.I ?? 100,
+    showBracket: options.showBracket ?? true,
+    showMath: options.showMath ?? false,
+  };
+
+  // Container layout
+  const root = document.createElement('div');
+  root.style.display = 'flex';
+  root.style.gap = '16px';
+  root.style.flexWrap = 'wrap';
+
+  const panelA = document.createElement('div');
+  const panelB = document.createElement('div');
+
+  // Controls
+  const controls = document.createElement('div');
+  controls.className = 'animation-controls';
+  controls.style.marginBottom = '12px';
+  controls.innerHTML = `
+    <label style="display: inline-flex; align-items: center; gap: 8px; margin-right: 16px;">
+      Income I: <input type="range" id="income-slider" min="${cfg.Imin}" max="${cfg.Imax}" value="${state.I}" step="0.5" style="width: 200px;">
+      <span id="income-value" style="min-width: 50px; font-weight: bold;">${state.I.toFixed(1)}</span>
+    </label>
+    <label style="display: inline-flex; align-items: center; gap: 6px; margin-right: 12px;">
+      <input type="checkbox" id="show-bracket" ${state.showBracket ? 'checked' : ''}> Show ΔV bracket
+    </label>
+    <label style="display: inline-flex; align-items: center; gap: 6px;">
+      <input type="checkbox" id="show-math" ${state.showMath ? 'checked' : ''}> Show math overlay
+    </label>
+  `;
+
+  const mathOverlay = document.createElement('div');
+  mathOverlay.id = 'math-overlay';
+  mathOverlay.style.display = state.showMath ? 'block' : 'none';
+  mathOverlay.style.padding = '10px';
+  mathOverlay.style.background = '#fffbf0';
+  mathOverlay.style.border = '1px solid #ddd';
+  mathOverlay.style.borderRadius = '4px';
+  mathOverlay.style.marginBottom = '12px';
+  mathOverlay.style.fontSize = '13px';
+  mathOverlay.innerHTML = `
+    <strong>Envelope Cancellation:</strong><br>
+    Chain rule: dV/dθ = ∂f/∂θ + ∇<sub>x</sub>f · (dx*/dθ)<br>
+    KKT stationarity: ∇<sub>x</sub>f = Σ λ<sub>j</sub> ∇<sub>x</sub>g<sub>j</sub> at optimum<br>
+    → Indirect effect <span style="text-decoration: line-through;">∇<sub>x</sub>f · (dx*/dθ)</span> cancels<br>
+    <strong>Result: dV/dθ = ∂ℒ/∂θ |(x*,λ*)</strong>
+  `;
+
+  const caption = document.createElement('div');
+  caption.style.marginTop = '8px';
+  caption.style.padding = '8px';
+  caption.style.background = cfg.themeBg;
+  caption.style.borderRadius = '4px';
+  caption.innerHTML = `
+    <em>Envelope identity</em>: dV/dI = ∂ℒ/∂I |(x*,λ*) = λ*. The tangent slope of V(I) equals the shadow price λ* from the constrained problem.
+  `;
+
+  container.appendChild(controls);
+  container.appendChild(mathOverlay);
+  root.appendChild(panelA);
+  root.appendChild(panelB);
+  container.appendChild(root);
+  container.appendChild(caption);
+
+  // Economics: U(x,y)=sqrt(xy), budget 2x+3y=I
+  const solve = (I) => {
+    const x = I / 4;
+    const y = I / 6;
+    const U = Math.sqrt(x * y); // = I/(2*sqrt(6))
+    // λ*: derivative of value wrt I equals multiplier. Closed form: 1/(2*sqrt(6))
+    // Keep general formula via MRS as in ch7 module: λ = (∂U/∂x)/p_x at optimum
+    // ∂U/∂x = 0.5 * sqrt(y/x), p_x = 2
+    const lambda = 0.5 * Math.sqrt(y / x) / 2;
+    return { x, y, U, lambda };
+  };
+
+  function render() {
+    const I = state.I;
+    const cur = solve(I);
+
+    // Panel A: budget + utility contours + optimum
+    const budgetData = Array.from({ length: 120 }, (_, i) => {
+      const x = (i / 119) * (I / 2);
+      const y = (I - 2 * x) / 3;
+      return { x, y };
+    });
+
+    const contourLevels = [0.6, 0.85, 1.0];
+    const contours = contourLevels.map((f) => {
+      const level = f * cur.U;
+      return Array.from({ length: 160 }, (_, i) => {
+        const x = Math.max(0.2, (i / 159) * (I / 2) + 0.2);
+        const y = (level * level) / x;
+        return { x, y };
+      }).filter((p) => p.y >= 0 && p.y <= (I / 3) * 1.25);
+    });
+
+    const marksA = [
+      // contours
+      ...contours.map((c, idx) =>
+        Plot.line(c, {
+          x: 'x',
+          y: 'y',
+          stroke: idx === contours.length - 1 ? '#00AA00' : '#90EE90',
+          strokeWidth: idx === contours.length - 1 ? 2 : 1,
+          opacity: 0.8,
+        })
+      ),
+      // budget line
+      Plot.line(budgetData, { x: 'x', y: 'y', stroke: 'steelblue', strokeWidth: 2.5 }),
+      // optimum point and labels
+      Plot.dot([{ x: cur.x, y: cur.y }], { x: 'x', y: 'y', r: 8, fill: 'crimson', stroke: 'white', strokeWidth: 2 }),
+      Plot.text([{ x: cur.x, y: cur.y }], {
+        x: 'x',
+        y: 'y',
+        text: () => '★',
+        dy: -10,
+        fontSize: 16,
+        fontWeight: 'bold',
+      }),
+      Plot.text([{ x: Math.min(I / 2 * 0.75, cur.x + 4), y: Math.max(0, cur.y + 4) }], {
+        x: 'x',
+        y: 'y',
+        text: () => `λ* = ${cur.lambda.toFixed(4)}`,
+        fill: '#444',
+        fontSize: 11,
+      }),
+      Plot.text([{ x: I / 2 * 0.55, y: (I / 3) * 1.05 }], { x: 'x', y: 'y', text: () => `Budget: 2x+3y=${I.toFixed(1)}`, fill: 'steelblue', fontSize: 11 }),
+    ];
+
+    const plotA = Plot.plot({
+      width: cfg.widthLeft,
+      height: cfg.height,
+      marginLeft: 52,
+      x: { domain: [0, (cfg.Imax / 2) * 1.2], label: 'x' },
+      y: { domain: [0, (cfg.Imax / 3) * 1.2], label: 'y' },
+      marks: marksA,
+    });
+
+    // Panel B: value function V(I) with tangent
+    const valueData = Array.from({ length: 100 }, (_, i) => {
+      const income = cfg.Imin + (i / 99) * (cfg.Imax - cfg.Imin);
+      const opt = solve(income);
+      return { income, value: opt.U };
+    });
+
+    const tangentData = Array.from({ length: 20 }, (_, i) => {
+      const income = I - 10 + (i / 19) * 20;
+      const value = cur.U + cur.lambda * (income - I);
+      return { income, value };
+    });
+
+    // Small bracket for ΔV ≈ λ*·ΔI
+    const deltaI = 1;
+    const next = solve(I + deltaI);
+    const deltaV = next.U - cur.U;
+    const approxDeltaV = cur.lambda * deltaI;
+
+    const marksB = [
+      Plot.line(valueData, { x: 'income', y: 'value', stroke: 'green', strokeWidth: 2.5 }),
+      Plot.dot([{ income: I, value: cur.U }], { x: 'income', y: 'value', r: 7, fill: 'crimson', stroke: 'white', strokeWidth: 2 }),
+      Plot.line(tangentData, { x: 'income', y: 'value', stroke: 'orange', strokeWidth: 2.5, strokeDasharray: '5,3' }),
+      Plot.text([{ income: I + 12, value: cur.U + cur.lambda * 12 }], {
+        x: 'income',
+        y: 'value',
+        text: () => `slope = λ* = ${cur.lambda.toFixed(4)}`,
+        fontSize: 11,
+        fill: 'orange',
+        fontWeight: 'bold',
+      }),
+      // Bracket showing ΔV
+      Plot.link([{ x1: I + deltaI, y1: cur.U, x2: I + deltaI, y2: next.U }], {
+        x1: 'x1',
+        y1: 'y1',
+        x2: 'x2',
+        y2: 'y2',
+        stroke: 'purple',
+        strokeWidth: 2,
+        markerEnd: 'arrow',
+      }),
+      Plot.text([{ income: I + deltaI + 2, value: (cur.U + next.U) / 2 }], {
+        x: 'income',
+        y: 'value',
+        text: () => `ΔV ≈ ${deltaV.toFixed(4)}`,
+        fill: 'purple',
+        fontSize: 10,
+        fontWeight: 'bold',
+      }),
+    ];
+
+    const plotB = Plot.plot({
+      width: cfg.widthRight,
+      height: cfg.height,
+      marginLeft: 60,
+      x: { domain: [cfg.Imin, cfg.Imax], label: 'Income I' },
+      y: { label: 'Value V(I)' },
+      marks: marksB,
+    });
+
+    panelA.innerHTML = '<h4 style="margin: 5px 0; font-size: 14px;">Consumer Problem</h4>';
+    panelA.appendChild(plotA);
+
+    panelB.innerHTML = '<h4 style="margin: 5px 0; font-size: 14px;">Value Function V(I)</h4>';
+    panelB.appendChild(plotB);
+  }
+
+  // Event listeners
+  const incomeSlider = controls.querySelector('#income-slider');
+  const incomeValue = controls.querySelector('#income-value');
+  const showBracketCheck = controls.querySelector('#show-bracket');
+  const showMathCheck = controls.querySelector('#show-math');
+
+  incomeSlider.addEventListener('input', (e) => {
+    state.I = parseFloat(e.target.value);
+    incomeValue.textContent = state.I.toFixed(1);
+    render();
+  });
+
+  showBracketCheck.addEventListener('change', (e) => {
+    state.showBracket = e.target.checked;
+    render();
+  });
+
+  showMathCheck.addEventListener('change', (e) => {
+    state.showMath = e.target.checked;
+    mathOverlay.style.display = state.showMath ? 'block' : 'none';
+  });
+
+  // Initial render
+  render();
+
+  // Cleanup
+  return {
+    destroy() {
+      // No timers to clean up
+    },
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_envelope_tangent_check'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_envelope_tangent_check');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_envelope_tangent_check', e);
+    }
+  })();
+
+  // ch8_maximum_continuity.js
+  (function(){
+    // Chapter 8: Theorem of the Maximum — Interactive Continuity Explorer
+// Public API: export function init(container, options)
+// User controls parameter θ with slider; see x*(θ) and V(θ) continuity in three linked panels.
+
+function init(container, options = {}) {
+  // Config
+  const cfg = {
+    thetaMin: options.thetaMin ?? 80,
+    thetaMax: options.thetaMax ?? 120,
+    widthPanel: options.widthPanel ?? 360,
+    heightTop: options.heightTop ?? 280,
+    heightBottom: options.heightBottom ?? 240,
+    themeBg: getComputedStyle(document.documentElement).getPropertyValue('--bg-tertiary')?.trim() || '#f5f5f5'
+  };
+
+  // State
+  const state = {
+    theta: options.theta ?? 100,
+    counterexample: options.counterexample ?? false,
+    animating: false,
+    animTimer: null,
+  };
+
+  // Controls
+  const controls = document.createElement('div');
+  controls.className = 'animation-controls';
+  controls.style.marginBottom = '12px';
+  controls.innerHTML = `
+    <label style="display: inline-flex; align-items: center; gap: 8px; margin-right: 16px;">
+      Parameter θ (Income): <input type="range" id="theta-slider" min="${cfg.thetaMin}" max="${cfg.thetaMax}" value="${state.theta}" step="0.5" style="width: 200px;">
+      <span id="theta-value" style="min-width: 50px; font-weight: bold;">${state.theta.toFixed(1)}</span>
+    </label>
+    <label style="display: inline-flex; align-items: center; gap: 6px; margin-right: 12px;">
+      <input type="checkbox" id="show-counterexample" ${state.counterexample ? 'checked' : ''}> Show counterexample
+    </label>
+    <button id="animate-btn" style="padding: 4px 12px; cursor: pointer;">▶ Animate sweep</button>
+  `;
+
+  const badge = document.createElement('div');
+  badge.id = 'berge-badge';
+  badge.style.padding = '8px 12px';
+  badge.style.marginBottom = '12px';
+  badge.style.borderRadius = '4px';
+  badge.style.fontWeight = 'bold';
+  badge.style.display = 'inline-block';
+  updateBadge();
+
+  function updateBadge() {
+    if (state.counterexample) {
+      badge.style.background = '#ffe0e0';
+      badge.style.color = '#c00';
+      badge.innerHTML = '✗ Assumptions violated: non-compact or discontinuous → jumps possible';
+    } else {
+      badge.style.background = '#e0ffe0';
+      badge.style.color = '#060';
+      badge.innerHTML = '✓ Berge conditions satisfied: x*(θ) and V(θ) are continuous';
+    }
+  }
+
+  const root = document.createElement('div');
+  root.style.display = 'flex';
+  root.style.gap = '16px';
+  root.style.flexWrap = 'wrap';
+
+  const panel1 = document.createElement('div');
+  const panel2 = document.createElement('div');
+  const panel3 = document.createElement('div');
+  panel3.style.flexBasis = '100%';
+
+  const caption = document.createElement('div');
+  caption.style.marginTop = '8px';
+  caption.style.padding = '8px';
+  caption.style.background = cfg.themeBg;
+  caption.style.borderRadius = '4px';
+  caption.innerHTML = `
+    <em>Theorem of the Maximum (Berge, 1963)</em>: Under continuity and compactness assumptions, both the policy x*(θ) and value V(θ) are continuous—no jumps. Toggle counterexample to see what happens when assumptions fail.
+  `;
+
+  container.appendChild(controls);
+  container.appendChild(badge);
+  root.appendChild(panel1);
+  root.appendChild(panel2);
+  root.appendChild(panel3);
+  container.appendChild(root);
+  container.appendChild(caption);
+
+  // Economics: consumer problem max √(xy) s.t. 2x+3y=θ
+  const solve = (theta, counterex = false) => {
+    if (!counterex) {
+      // Normal case: continuous
+      const x = theta / 4;
+      const y = theta / 6;
+      const V = Math.sqrt(x * y);
+      return { x, y, V };
+    } else {
+      // Counterexample: introduce a jump at theta=100
+      const thetaCrit = 100;
+      if (theta < thetaCrit) {
+        const x = theta / 4;
+        const y = theta / 6;
+        const V = Math.sqrt(x * y);
+        return { x, y, V };
+      } else {
+        // Jump: different solution branch
+        const x = theta / 4 + 3; // artificial jump
+        const y = theta / 6 - 1;
+        const V = Math.sqrt(Math.max(0.1, x * y));
+        return { x, y, V };
+      }
+    }
+  };
+
+  function render() {
+    const theta = state.theta;
+    const cur = solve(theta, state.counterexample);
+
+    // Panel 1: Feasible set view
+    const budgetData = Array.from({ length: 120 }, (_, i) => {
+      const x = (i / 119) * (theta / 2);
+      const y = (theta - 2 * x) / 3;
+      return { x, y };
+    });
+
+    const contourLevels = [0.7, 0.9, 1.0];
+    const contours = contourLevels.map((f) => {
+      const level = f * cur.V;
+      return Array.from({ length: 160 }, (_, i) => {
+        const x = Math.max(0.2, (i / 159) * (theta / 2) + 0.2);
+        const y = (level * level) / x;
+        return { x, y };
+      }).filter((p) => p.y >= 0 && p.y <= (theta / 3) * 1.2);
+    });
+
+    const marks1 = [
+      ...contours.map((c, idx) =>
+        Plot.line(c, {
+          x: 'x',
+          y: 'y',
+          stroke: idx === contours.length - 1 ? '#00AA00' : '#90EE90',
+          strokeWidth: idx === contours.length - 1 ? 2 : 1,
+          opacity: 0.7,
+        })
+      ),
+      Plot.line(budgetData, { x: 'x', y: 'y', stroke: 'steelblue', strokeWidth: 2.5 }),
+      Plot.dot([{ x: cur.x, y: cur.y }], { x: 'x', y: 'y', r: 9, fill: 'crimson', stroke: 'white', strokeWidth: 2 }),
+      Plot.text([{ x: cur.x, y: cur.y }], {
+        x: 'x',
+        y: 'y',
+        text: () => `x*(θ)`,
+        dy: -12,
+        fontSize: 12,
+        fontWeight: 'bold',
+      }),
+      Plot.text([{ x: theta / 2 * 0.6, y: (theta / 3) * 1.05 }], {
+        x: 'x',
+        y: 'y',
+        text: () => `θ = ${theta.toFixed(1)}`,
+        fill: 'steelblue',
+        fontSize: 11,
+      }),
+    ];
+
+    const plot1 = Plot.plot({
+      width: cfg.widthPanel,
+      height: cfg.heightTop,
+      marginLeft: 52,
+      x: { domain: [0, (cfg.thetaMax / 2) * 1.1], label: 'x' },
+      y: { domain: [0, (cfg.thetaMax / 3) * 1.1], label: 'y' },
+      marks: marks1,
+    });
+
+    // Panel 2: Policy function x*(θ)
+    const policyData = Array.from({ length: 100 }, (_, i) => {
+      const t = cfg.thetaMin + (i / 99) * (cfg.thetaMax - cfg.thetaMin);
+      const sol = solve(t, state.counterexample);
+      return { theta: t, x: sol.x };
+    });
+
+    const marks2 = [
+      Plot.line(policyData, { x: 'theta', y: 'x', stroke: 'purple', strokeWidth: 2.5 }),
+      Plot.ruleX([theta], { stroke: 'crimson', strokeWidth: 2, strokeDasharray: '4,2' }),
+      Plot.dot([{ theta, x: cur.x }], { x: 'theta', y: 'x', r: 7, fill: 'crimson', stroke: 'white', strokeWidth: 2 }),
+      Plot.text([{ theta: theta + 5, x: cur.x }], {
+        x: 'theta',
+        y: 'x',
+        text: () => `x* = ${cur.x.toFixed(2)}`,
+        fontSize: 11,
+        fill: 'purple',
+        fontWeight: 'bold',
+      }),
+    ];
+
+    const plot2 = Plot.plot({
+      width: cfg.widthPanel,
+      height: cfg.heightTop,
+      marginLeft: 52,
+      x: { domain: [cfg.thetaMin, cfg.thetaMax], label: 'Parameter θ' },
+      y: { label: 'Policy x*(θ)' },
+      marks: marks2,
+    });
+
+    // Panel 3: Value function V(θ)
+    const valueData = Array.from({ length: 100 }, (_, i) => {
+      const t = cfg.thetaMin + (i / 99) * (cfg.thetaMax - cfg.thetaMin);
+      const sol = solve(t, state.counterexample);
+      return { theta: t, V: sol.V };
+    });
+
+    const marks3 = [
+      Plot.line(valueData, { x: 'theta', y: 'V', stroke: 'green', strokeWidth: 2.5 }),
+      Plot.ruleX([theta], { stroke: 'crimson', strokeWidth: 2, strokeDasharray: '4,2' }),
+      Plot.dot([{ theta, V: cur.V }], { x: 'theta', y: 'V', r: 7, fill: 'crimson', stroke: 'white', strokeWidth: 2 }),
+      Plot.text([{ theta: theta + 5, V: cur.V }], {
+        x: 'theta',
+        y: 'V',
+        text: () => `V = ${cur.V.toFixed(2)}`,
+        fontSize: 11,
+        fill: 'green',
+        fontWeight: 'bold',
+      }),
+    ];
+
+    const plot3 = Plot.plot({
+      width: cfg.widthPanel * 2 + 16,
+      height: cfg.heightBottom,
+      marginLeft: 52,
+      x: { domain: [cfg.thetaMin, cfg.thetaMax], label: 'Parameter θ' },
+      y: { label: 'Value V(θ)' },
+      marks: marks3,
+    });
+
+    panel1.innerHTML = '<h4 style="margin: 5px 0; font-size: 14px;">Feasible Set at θ</h4>';
+    panel1.appendChild(plot1);
+
+    panel2.innerHTML = '<h4 style="margin: 5px 0; font-size: 14px;">Policy x*(θ)</h4>';
+    panel2.appendChild(plot2);
+
+    panel3.innerHTML = '<h4 style="margin: 5px 0; font-size: 14px;">Value V(θ)</h4>';
+    panel3.appendChild(plot3);
+  }
+
+  // Event listeners
+  const thetaSlider = controls.querySelector('#theta-slider');
+  const thetaValue = controls.querySelector('#theta-value');
+  const counterexCheck = controls.querySelector('#show-counterexample');
+  const animateBtn = controls.querySelector('#animate-btn');
+
+  thetaSlider.addEventListener('input', (e) => {
+    state.theta = parseFloat(e.target.value);
+    thetaValue.textContent = state.theta.toFixed(1);
+    render();
+  });
+
+  counterexCheck.addEventListener('change', (e) => {
+    state.counterexample = e.target.checked;
+    updateBadge();
+    render();
+  });
+
+  animateBtn.addEventListener('click', () => {
+    if (state.animating) {
+      // Stop animation
+      if (state.animTimer) clearInterval(state.animTimer);
+      state.animating = false;
+      animateBtn.textContent = '▶ Animate sweep';
+    } else {
+      // Start animation
+      state.animating = true;
+      animateBtn.textContent = '⏸ Stop';
+      let dir = 1;
+      state.animTimer = setInterval(() => {
+        state.theta += dir * 0.5;
+        if (state.theta >= cfg.thetaMax) {
+          state.theta = cfg.thetaMax;
+          dir = -1;
+        } else if (state.theta <= cfg.thetaMin) {
+          state.theta = cfg.thetaMin;
+          dir = 1;
+        }
+        thetaSlider.value = state.theta;
+        thetaValue.textContent = state.theta.toFixed(1);
+        render();
+      }, 50);
+    }
+  });
+
+  // Initial render
+  render();
+
+  // Cleanup
+  return {
+    destroy() {
+      if (state.animTimer) clearInterval(state.animTimer);
+    },
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_maximum_continuity'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_maximum_continuity');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_maximum_continuity', e);
+    }
+  })();
+
   // ch8_rbc_policy.js
   (function(){
     // Chapter 8: Deterministic RBC Policy Explorer

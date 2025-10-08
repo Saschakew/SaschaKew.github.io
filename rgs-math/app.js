@@ -1229,7 +1229,10 @@ this.currentChapter = chapterIndex;
                         'ch8_value_iteration': 'ch8_value_iteration',
                         'ch8_envelope': 'ch8_envelope',
                         'ch8_brouwer': 'ch8_brouwer',
-                        'ch8_rbc_policy': 'ch8_rbc_policy'
+                        'ch8_rbc_policy': 'ch8_rbc_policy',
+                        // Chapter 8 interactive explorers
+                        'ch8_envelope_tangent_check': 'ch8_envelope_tangent_check',
+                        'ch8_maximum_continuity': 'ch8_maximum_continuity'
                     };
                     // Prefer alias if defined to avoid wrapper modules that try dynamic import in frozen builds
                     const mappedId = alias[id] || id;
@@ -1319,6 +1322,12 @@ this.currentChapter = chapterIndex;
                         // Dynamic import removed for static build
                         break;
                     case 'ch8_envelope':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch8_envelope_tangent_check':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch8_maximum_continuity':
                         // Dynamic import removed for static build
                         break;
                     case 'ch8_brouwer':
