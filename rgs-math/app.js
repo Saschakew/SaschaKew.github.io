@@ -1218,7 +1218,18 @@ this.currentChapter = chapterIndex;
                         'ch5_partials_surface_tangents_3d': 'ch5_partials_surface_tangents_3d',
                         'ch5_gradient_levelset_normal': 'ch5_gradient_surface_3d',
                         'ch5_gradient_surface_3d': 'ch5_gradient_surface_3d',
-                        'ch5_taylor_surfaces_3d': 'ch5_taylor_surfaces_3d'
+                        'ch5_taylor_surfaces_3d': 'ch5_taylor_surfaces_3d',
+                        // Chapter 7 new modules
+                        'ch7_complementary_slackness': 'ch7_complementary_slackness',
+                        'ch7_shadow_price': 'ch7_shadow_price',
+                        'ch7_active_set': 'ch7_active_set',
+                        'ch7_bliss_point': 'ch7_bliss_point',
+                        'ch7_constrained_soc': 'ch7_constrained_soc',
+                        // Chapter 8 new modules
+                        'ch8_value_iteration': 'ch8_value_iteration',
+                        'ch8_envelope': 'ch8_envelope',
+                        'ch8_brouwer': 'ch8_brouwer',
+                        'ch8_rbc_policy': 'ch8_rbc_policy'
                     };
                     // Prefer alias if defined to avoid wrapper modules that try dynamic import in frozen builds
                     const mappedId = alias[id] || id;
@@ -1286,6 +1297,34 @@ this.currentChapter = chapterIndex;
                         break;
                     // Chapter 7 interactive figures
                     case 'ch7_kkt_consumer_inequality':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch7_complementary_slackness':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch7_shadow_price':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch7_active_set':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch7_bliss_point':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch7_constrained_soc':
+                        // Dynamic import removed for static build
+                        break;
+                    // Chapter 8 interactive figures
+                    case 'ch8_value_iteration':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch8_envelope':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch8_brouwer':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch8_rbc_policy':
                         // Dynamic import removed for static build
                         break;
                     // Chapter 4 interactive figures

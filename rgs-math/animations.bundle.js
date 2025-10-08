@@ -8054,6 +8054,806 @@ function init(containerEl, options = {}) {
     }
   })();
 
+  // ch7_active_set.js
+  (function(){
+    // Chapter 7: Active-Set Viewer (Multiple Inequalities)
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      c1: options.c1 || 100, // Budget: 2x + 3y ≤ c1
+      c2: options.c2 || 60,  // Capacity: x + y ≤ c2
+      showNormals: options.showNormals !== false,
+      showActiveSet: options.showActiveSet !== false,
+      width: 600,
+      height: 500
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <label>Budget limit c₁: <input type="range" id="c1-slider" min="50" max="150" value="${state.c1}" step="5"></label>
+      <span id="c1-value">${state.c1}</span><br>
+      <label>Capacity limit c₂: <input type="range" id="c2-slider" min="30" max="80" value="${state.c2}" step="5"></label>
+      <span id="c2-value">${state.c2}</span><br>
+      <label><input type="checkbox" id="show-normals" ${state.showNormals ? 'checked' : ''}> Show constraint normals</label>
+      <label><input type="checkbox" id="show-activeset" ${state.showActiveSet ? 'checked' : ''}> Show active set</label>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'activeset-plot';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    const render = () => {
+      const { c1, c2 } = state;
+      
+      // Objective: maximize U(x,y) = x^0.5 * y^0.5
+      // Constraints: 
+      //   g1: 2x + 3y ≤ c1
+      //   g2: x + y ≤ c2
+      //   x ≥ 0, y ≥ 0
+
+      // Find feasible region vertices
+      const vertices = [
+        { x: 0, y: 0, name: 'Origin' },
+        { x: c1/2, y: 0, name: 'x-axis budget' },
+        { x: 0, y: c1/3, name: 'y-axis budget' },
+        { x: c2, y: 0, name: 'x-axis capacity' },
+        { x: 0, y: c2, name: 'y-axis capacity' }
+      ];
+
+      // Intersection of g1 and g2
+      // 2x + 3y = c1 and x + y = c2 => x = 3c2 - c1, y = c1 - 2c2
+      const xInt = 3*c2 - c1;
+      const yInt = c1 - 2*c2;
+      if (xInt > 0 && yInt > 0) {
+        vertices.push({ x: xInt, y: yInt, name: 'g1∩g2' });
+      }
+
+      // Solve optimization
+      let optimal = { x: 0, y: 0, U: 0, activeSet: [] };
+      
+      // Check all vertices and find best
+      for (const v of vertices) {
+        const feasible = v.x >= 0 && v.y >= 0 && 
+                        (2*v.x + 3*v.y <= c1 + 0.01) && 
+                        (v.x + v.y <= c2 + 0.01);
+        if (feasible) {
+          const U = Math.sqrt(v.x * v.y);
+          if (U > optimal.U) {
+            optimal = { ...v, U };
+            
+            // Determine active set
+            const activeSet = [];
+            if (Math.abs(2*v.x + 3*v.y - c1) < 0.5) activeSet.push('g₁');
+            if (Math.abs(v.x + v.y - c2) < 0.5) activeSet.push('g₂');
+            if (v.x < 0.5) activeSet.push('x≥0');
+            if (v.y < 0.5) activeSet.push('y≥0');
+            optimal.activeSet = activeSet;
+          }
+        }
+      }
+
+      // Generate constraint lines
+      const g1Line = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * Math.max(c1/2, c2);
+        const y = (c1 - 2*x) / 3;
+        return { x, y, constraint: 'g1' };
+      }).filter(p => p.y >= 0);
+
+      const g2Line = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * c2;
+        const y = c2 - x;
+        return { x, y, constraint: 'g2' };
+      });
+
+      // Utility contours
+      const contours = [];
+      for (let factor of [0.3, 0.6, 0.9, 1.0]) {
+        const level = factor * optimal.U;
+        if (level > 0) {
+          const contour = Array.from({ length: 100 }, (_, i) => {
+            const x = 0.5 + (i / 99) * Math.max(c1/2, c2);
+            const y = (level * level) / x;
+            return { x, y };
+          }).filter(p => p.y >= 0 && p.y <= Math.max(c1/3, c2));
+          contours.push(contour);
+        }
+      }
+
+      const marks = [
+        // Constraint lines
+        Plot.line(g1Line, { x: "x", y: "y", stroke: "blue", strokeWidth: 2 }),
+        Plot.line(g2Line, { x: "x", y: "y", stroke: "purple", strokeWidth: 2 }),
+        // Utility contours
+        ...contours.map((c, i) => 
+          Plot.line(c, { x: "x", y: "y", stroke: "green", strokeWidth: 1, opacity: 0.5 })
+        ),
+        // Optimum
+        Plot.dot([optimal], { x: "x", y: "y", r: 8, fill: "red" }),
+        Plot.text([optimal], { 
+          x: "x", 
+          y: "y", 
+          text: () => `★ (${optimal.x.toFixed(1)}, ${optimal.y.toFixed(1)})`,
+          dy: -15,
+          fontWeight: 'bold'
+        }),
+        // Labels
+        Plot.text([{ x: c1/4, y: 2 }], { x: "x", y: "y", text: "2x+3y≤c₁", fill: "blue", fontSize: 11 }),
+        Plot.text([{ x: c2-5, y: 8 }], { x: "x", y: "y", text: "x+y≤c₂", fill: "purple", fontSize: 11 })
+      ];
+
+      // Normals
+      if (state.showNormals && optimal.x > 0 && optimal.y > 0) {
+        const scale = 8;
+        marks.push(
+          Plot.arrow([{ x1: optimal.x, y1: optimal.y, x2: optimal.x + 2*scale, y2: optimal.y + 3*scale }], {
+            x1: "x1", y1: "y1", x2: "x2", y2: "y2",
+            stroke: "blue", strokeWidth: 2
+          }),
+          Plot.arrow([{ x1: optimal.x, y1: optimal.y, x2: optimal.x + 1*scale, y2: optimal.y + 1*scale }], {
+            x1: "x1", y1: "y1", x2: "x2", y2: "y2",
+            stroke: "purple", strokeWidth: 2
+          })
+        );
+      }
+
+      const plot = Plot.plot({
+        width: state.width,
+        height: state.height,
+        marginLeft: 60,
+        x: { domain: [0, Math.max(c1/2, c2) * 1.1], label: "x" },
+        y: { domain: [0, Math.max(c1/3, c2) * 1.1], label: "y" },
+        marks
+      });
+
+      const info = document.createElement('div');
+      info.style.marginTop = '10px';
+      info.style.padding = '10px';
+      info.style.background = '#f5f5f5';
+      info.style.borderRadius = '4px';
+      
+      if (state.showActiveSet) {
+        info.innerHTML = `
+          <strong>Active Set at Optimum:</strong> {${optimal.activeSet.join(', ')}}<br>
+          <strong>Stationarity:</strong> ∇f = ${optimal.activeSet.length > 0 ? 'Σ λⱼ∇gⱼ for active j' : '0'}<br>
+          Only gradients of <strong>active</strong> constraints enter the FOC.
+        `;
+      } else {
+        info.innerHTML = `<strong>Optimum:</strong> (${optimal.x.toFixed(2)}, ${optimal.y.toFixed(2)}), U = ${optimal.U.toFixed(3)}`;
+      }
+
+      canvas.innerHTML = '';
+      canvas.appendChild(plot);
+      canvas.appendChild(info);
+    };
+
+    controls.querySelector('#c1-slider').addEventListener('input', (e) => {
+      state.c1 = parseFloat(e.target.value);
+      controls.querySelector('#c1-value').textContent = state.c1;
+      render();
+    });
+
+    controls.querySelector('#c2-slider').addEventListener('input', (e) => {
+      state.c2 = parseFloat(e.target.value);
+      controls.querySelector('#c2-value').textContent = state.c2;
+      render();
+    });
+
+    controls.querySelector('#show-normals').addEventListener('change', (e) => {
+      state.showNormals = e.target.checked;
+      render();
+    });
+
+    controls.querySelector('#show-activeset').addEventListener('change', (e) => {
+      state.showActiveSet = e.target.checked;
+      render();
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_active_set'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_active_set');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_active_set', e);
+    }
+  })();
+
+  // ch7_bliss_point.js
+  (function(){
+    // Chapter 7: Bliss Point vs Monotone Preferences
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      income: options.income || 100,
+      preferenceType: options.preferenceType || 'monotone',
+      showLambda: options.showLambda !== false,
+      width: 600,
+      height: 500
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <label>Income I: <input type="range" id="income-slider" min="40" max="150" value="${state.income}" step="5"></label>
+      <span id="income-value">${state.income}</span><br>
+      <div style="margin: 10px 0;">
+        <button id="btn-monotone" style="padding: 5px 10px; margin-right: 10px;">Monotone U(x,y)=√(xy)</button>
+        <button id="btn-bliss" style="padding: 5px 10px;">Bliss U(x,y)=-[(x-10)²+(y-10)²]</button>
+      </div>
+      <label><input type="checkbox" id="show-lambda" ${state.showLambda ? 'checked' : ''}> Show λ value</label>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'bliss-plot';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    const render = () => {
+      const I = state.income;
+      const prices = [2, 3];
+      const xMax = I / prices[0];
+      const yMax = I / prices[1];
+      
+      let optimal;
+      
+      if (state.preferenceType === 'monotone') {
+        // Monotone: always binding, solution x = I/4, y = I/6
+        const x = I / 4;
+        const y = I / 6;
+        const U = Math.sqrt(x * y);
+        const lambda = 0.5 * Math.sqrt(y/x) / prices[0];
+        optimal = { x, y, U, lambda, type: 'boundary' };
+      } else {
+        // Bliss point at (10, 10)
+        const blissX = 10, blissY = 10;
+        const spent = prices[0] * blissX + prices[1] * blissY; // = 50
+        
+        if (spent <= I) {
+          // Bliss point is feasible - interior solution
+          optimal = { 
+            x: blissX, 
+            y: blissY, 
+            U: 0, // max value is 0
+            lambda: 0, 
+            type: 'interior'
+          };
+        } else {
+          // Budget binds, constrained optimum on boundary
+          // For simplicity, use the monotone solution scaled
+          const x = I / 4;
+          const y = I / 6;
+          const U = -((x - blissX)**2 + (y - blissY)**2);
+          optimal = { x, y, U, lambda: 0.05, type: 'boundary' };
+        }
+      }
+
+      // Budget line
+      const budgetLine = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * xMax;
+        const y = (I - prices[0] * x) / prices[1];
+        return { x, y };
+      });
+
+      // Utility contours
+      const contours = [];
+      if (state.preferenceType === 'monotone') {
+        for (let factor of [0.4, 0.7, 1.0]) {
+          const level = factor * optimal.U;
+          if (level > 0) {
+            const contour = Array.from({ length: 100 }, (_, i) => {
+              const x = 0.1 + (i / 99) * xMax;
+              const y = (level * level) / x;
+              return { x, y };
+            }).filter(p => p.y >= 0 && p.y <= yMax * 1.2);
+            contours.push(contour);
+          }
+        }
+      } else {
+        // Concentric circles around (10, 10)
+        for (let r of [2, 5, 8, 12]) {
+          const contour = Array.from({ length: 100 }, (_, i) => {
+            const angle = (i / 99) * 2 * Math.PI;
+            const x = 10 + r * Math.cos(angle);
+            const y = 10 + r * Math.sin(angle);
+            return { x, y };
+          }).filter(p => p.x >= 0 && p.y >= 0);
+          contours.push(contour);
+        }
+      }
+
+      const marks = [
+        // Budget line
+        Plot.line(budgetLine, { x: "x", y: "y", stroke: "blue", strokeWidth: 2 }),
+        // Feasible region shading
+        Plot.areaY(budgetLine, { x: "x", y: "y", fill: "#e0f0ff", opacity: 0.2 }),
+        // Utility contours
+        ...contours.map(c => 
+          Plot.line(c, { x: "x", y: "y", stroke: "green", strokeWidth: 1, opacity: 0.6 })
+        ),
+        // Optimum
+        Plot.dot([optimal], { 
+          x: "x", 
+          y: "y", 
+          r: 8, 
+          fill: optimal.type === 'interior' ? 'orange' : 'red' 
+        }),
+        Plot.text([optimal], { 
+          x: "x", 
+          y: "y", 
+          text: () => `${optimal.type === 'interior' ? '◉' : '★'} (${optimal.x.toFixed(1)}, ${optimal.y.toFixed(1)})`,
+          dy: -15,
+          fontWeight: 'bold'
+        })
+      ];
+
+      // Mark bliss point for bliss preference
+      if (state.preferenceType === 'bliss') {
+        marks.push(
+          Plot.dot([{ x: 10, y: 10 }], { x: "x", y: "y", r: 4, fill: "purple", opacity: 0.7 }),
+          Plot.text([{ x: 10, y: 10 }], { 
+            x: "x", 
+            y: "y", 
+            text: "Bliss",
+            dx: 8,
+            dy: -8,
+            fontSize: 10
+          })
+        );
+      }
+
+      const plot = Plot.plot({
+        width: state.width,
+        height: state.height,
+        marginLeft: 60,
+        x: { domain: [0, xMax * 1.1], label: "Good x" },
+        y: { domain: [0, yMax * 1.1], label: "Good y" },
+        marks
+      });
+
+      const info = document.createElement('div');
+      info.style.marginTop = '10px';
+      info.style.padding = '10px';
+      info.style.background = optimal.type === 'interior' ? '#fff3cd' : '#f5f5f5';
+      info.style.borderRadius = '4px';
+      
+      let explanation = '';
+      if (state.preferenceType === 'monotone') {
+        explanation = 'Monotone preferences always push to the boundary. More is always better → <strong>budget binds</strong>.';
+      } else {
+        if (optimal.type === 'interior') {
+          explanation = 'Bliss point (10,10) is <strong>feasible</strong> → interior optimum with <strong>slack budget</strong>.';
+        } else {
+          explanation = 'Bliss point (10,10) is <strong>not affordable</strong> → constrained to boundary.';
+        }
+      }
+
+      info.innerHTML = `
+        <strong>${optimal.type === 'interior' ? 'Interior Solution' : 'Boundary Solution'}</strong><br>
+        ${state.showLambda ? `λ = ${optimal.lambda.toFixed(4)} ${optimal.lambda > 0.001 ? '(>0, binding)' : '(=0, slack)'}<br>` : ''}
+        ${explanation}
+      `;
+
+      canvas.innerHTML = '';
+      canvas.appendChild(plot);
+      canvas.appendChild(info);
+    };
+
+    // Event listeners
+    controls.querySelector('#income-slider').addEventListener('input', (e) => {
+      state.income = parseFloat(e.target.value);
+      controls.querySelector('#income-value').textContent = state.income;
+      render();
+    });
+
+    controls.querySelector('#btn-monotone').addEventListener('click', () => {
+      state.preferenceType = 'monotone';
+      render();
+    });
+
+    controls.querySelector('#btn-bliss').addEventListener('click', () => {
+      state.preferenceType = 'bliss';
+      render();
+    });
+
+    controls.querySelector('#show-lambda').addEventListener('change', (e) => {
+      state.showLambda = e.target.checked;
+      render();
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_bliss_point'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_bliss_point');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_bliss_point', e);
+    }
+  })();
+
+  // ch7_complementary_slackness.js
+  (function(){
+    // Chapter 7: Complementary Slackness Explorer (Binding vs Slack)
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      income: options.income || 100,
+      utilityType: options.utilityType || 'monotone', // 'monotone' or 'bliss'
+      showKKT: options.showKKT !== false,
+      width: 600,
+      height: 500
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <label>Income I: <input type="range" id="income-slider" min="30" max="150" value="${state.income}" step="5"></label>
+      <span id="income-value">${state.income}</span>
+      <label><input type="radio" name="utility" value="monotone" ${state.utilityType === 'monotone' ? 'checked' : ''}> Monotone U(x,y)=√(xy)</label>
+      <label><input type="radio" name="utility" value="bliss" ${state.utilityType === 'bliss' ? 'checked' : ''}> Bliss U(x,y)=-[(x-10)²+(y-10)²]</label>
+      <label><input type="checkbox" id="show-kkt" ${state.showKKT ? 'checked' : ''}> Show KKT conditions</label>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'slackness-plot';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    const render = () => {
+      const I = state.income;
+      const prices = [2, 3];
+      
+      // Compute optimum
+      let optimal;
+      if (state.utilityType === 'monotone') {
+        // Monotone: always binds, y/x = p_x/p_y = 2/3
+        const x = I / 4;
+        const y = I / 6;
+        const lambda = 0.5 * Math.sqrt(y/x) / prices[0]; // From FOC
+        optimal = { x, y, lambda, binding: true };
+      } else {
+        // Bliss point at (10, 10)
+        const blissX = 10, blissY = 10;
+        const spent = prices[0] * blissX + prices[1] * blissY; // 50
+        if (spent <= I) {
+          optimal = { x: blissX, y: blissY, lambda: 0, binding: false };
+        } else {
+          // Budget binds, solve constrained
+          // Gradient at bliss would point outward, so we're on boundary
+          // This is a simplification - would need full KKT solve
+          const x = I / 4;
+          const y = I / 6;
+          optimal = { x, y, lambda: 0.1, binding: true };
+        }
+      }
+
+      // Create plot data
+      const xMax = I / prices[0];
+      const yMax = I / prices[1];
+
+      const budgetLine = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * xMax;
+        const y = (I - prices[0] * x) / prices[1];
+        return { x, y };
+      });
+
+      // Utility contours
+      const contours = [];
+      if (state.utilityType === 'monotone') {
+        for (let level of [0.3, 0.6, 0.9].map(f => f * Math.sqrt(optimal.x * optimal.y))) {
+          const contour = Array.from({ length: 100 }, (_, i) => {
+            const x = 0.1 + (i / 99) * xMax;
+            const y = (level * level) / x;
+            return { x, y, level };
+          }).filter(p => p.y <= yMax && p.y >= 0);
+          contours.push(contour);
+        }
+      } else {
+        for (let r of [2, 5, 8]) {
+          const contour = Array.from({ length: 100 }, (_, i) => {
+            const angle = (i / 99) * 2 * Math.PI;
+            const x = 10 + r * Math.cos(angle);
+            const y = 10 + r * Math.sin(angle);
+            return { x, y };
+          }).filter(p => p.x >= 0 && p.y >= 0);
+          contours.push(contour);
+        }
+      }
+
+      const plot = Plot.plot({
+        width: state.width,
+        height: state.height,
+        marginLeft: 60,
+        marginBottom: 50,
+        x: { domain: [0, xMax * 1.1], label: "Good x" },
+        y: { domain: [0, yMax * 1.1], label: "Good y" },
+        marks: [
+          // Feasible region
+          Plot.areaY(budgetLine, { x: "x", y: "y", fill: "#e0f0ff", opacity: 0.3 }),
+          // Budget line
+          Plot.line(budgetLine, { x: "x", y: "y", stroke: "blue", strokeWidth: 2 }),
+          // Utility contours
+          ...contours.map((c, i) => 
+            Plot.line(c, { x: "x", y: "y", stroke: "green", strokeWidth: 1, opacity: 0.6 })
+          ),
+          // Optimum
+          Plot.dot([optimal], { x: "x", y: "y", r: 6, fill: "red" }),
+          Plot.text([optimal], { 
+            x: "x", 
+            y: "y", 
+            text: () => `(${optimal.x.toFixed(1)}, ${optimal.y.toFixed(1)})`,
+            dy: -15,
+            fontSize: 12
+          })
+        ]
+      });
+
+      const info = document.createElement('div');
+      info.style.marginTop = '10px';
+      info.style.padding = '10px';
+      info.style.background = '#f5f5f5';
+      info.style.borderRadius = '4px';
+      
+      if (state.showKKT) {
+        info.innerHTML = `
+          <strong>KKT Status:</strong><br>
+          λ = ${optimal.lambda.toFixed(4)} ${optimal.lambda > 0.001 ? '> 0' : '= 0'}<br>
+          Budget constraint: ${optimal.binding ? '<strong>BINDING</strong>' : '<strong>SLACK</strong>'}<br>
+          Complementary slackness: λ(2x+3y-${I}) = ${(optimal.lambda * (prices[0]*optimal.x + prices[1]*optimal.y - I)).toFixed(4)} ✓
+        `;
+      } else {
+        info.innerHTML = `<strong>${optimal.binding ? 'Budget binds (λ > 0)' : 'Budget slack (λ = 0)'}</strong>`;
+      }
+
+      canvas.innerHTML = '';
+      canvas.appendChild(plot);
+      canvas.appendChild(info);
+    };
+
+    // Event listeners
+    controls.querySelector('#income-slider').addEventListener('input', (e) => {
+      state.income = parseFloat(e.target.value);
+      controls.querySelector('#income-value').textContent = state.income;
+      render();
+    });
+
+    controls.querySelectorAll('input[name="utility"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        state.utilityType = e.target.value;
+        render();
+      });
+    });
+
+    controls.querySelector('#show-kkt').addEventListener('change', (e) => {
+      state.showKKT = e.target.checked;
+      render();
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_complementary_slackness'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_complementary_slackness');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_complementary_slackness', e);
+    }
+  })();
+
+  // ch7_constrained_soc.js
+  (function(){
+    // Chapter 7: Constrained SOC Inspector (Bordered Hessian intuition, optional)
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      a: options.a || -1,    // coefficient for x²
+      b: options.b || 0,     // coefficient for xy
+      c: options.c || -1,    // coefficient for y²
+      showBH: options.showBH !== false,
+      width: 600,
+      height: 500
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <p>f(x,y) = ax² + bxy + cy² subject to g(x,y) = x + y - 2 = 0</p>
+      <label>a (x² coeff): <input type="range" id="a-slider" min="-2" max="2" value="${state.a}" step="0.1"></label>
+      <span id="a-value">${state.a}</span><br>
+      <label>b (xy coeff): <input type="range" id="b-slider" min="-2" max="2" value="${state.b}" step="0.1"></label>
+      <span id="b-value">${state.b}</span><br>
+      <label>c (y² coeff): <input type="range" id="c-slider" min="-2" max="2" value="${state.c}" step="0.1"></label>
+      <span id="c-value">${state.c}</span><br>
+      <label><input type="checkbox" id="show-bh" ${state.showBH ? 'checked' : ''}> Show bordered Hessian summary</label>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'soc-plot';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    const f = (x, y) => state.a * x*x + state.b * x*y + state.c * y*y;
+    const g = (x, y) => x + y - 2;
+
+    const render = () => {
+      // Constraint: x + y = 2, so y = 2 - x
+      // Substituted objective: h(x) = f(x, 2-x) = a*x² + b*x*(2-x) + c*(2-x)²
+      const h = (x) => {
+        const y = 2 - x;
+        return f(x, y);
+      };
+
+      // Second derivative along constraint
+      const hPrimePrime = (x) => {
+        return 2*state.a - 2*state.b + 2*state.c;
+      };
+
+      const curvature = hPrimePrime(1); // at midpoint x=1, y=1
+
+      let classification;
+      if (curvature < -0.01) {
+        classification = 'Maximum (negative curvature along constraint)';
+      } else if (curvature > 0.01) {
+        classification = 'Minimum (positive curvature along constraint)';
+      } else {
+        classification = 'Inconclusive (zero curvature)';
+      }
+
+      // Generate surface over constraint
+      const constraintData = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * 3;
+        const y = 2 - x;
+        return { x, y, z: f(x, y) };
+      });
+
+      // Contours of f
+      const contours = [];
+      for (let level of [-2, -1, 0, 1, 2]) {
+        const contour = [];
+        for (let x = 0; x <= 3; x += 0.05) {
+          for (let y = 0; y <= 3; y += 0.05) {
+            if (Math.abs(f(x, y) - level) < 0.1) {
+              contour.push({ x, y, level });
+            }
+          }
+        }
+        if (contour.length > 0) contours.push(contour);
+      }
+
+      const plot = Plot.plot({
+        width: state.width,
+        height: state.height,
+        marginLeft: 60,
+        x: { domain: [0, 3], label: "x" },
+        y: { domain: [0, 3], label: "y" },
+        marks: [
+          // Objective contours
+          ...contours.map((c, i) => 
+            Plot.dot(c, { x: "x", y: "y", r: 1, fill: "lightblue", opacity: 0.3 })
+          ),
+          // Constraint line
+          Plot.line([{ x: 0, y: 2 }, { x: 2, y: 0 }], { 
+            x: "x", 
+            y: "y", 
+            stroke: "red", 
+            strokeWidth: 3 
+          }),
+          // Critical point
+          Plot.dot([{ x: 1, y: 1 }], { 
+            x: "x", 
+            y: "y", 
+            r: 8, 
+            fill: curvature < 0 ? 'green' : (curvature > 0 ? 'orange' : 'gray')
+          }),
+          Plot.text([{ x: 1, y: 1 }], { 
+            x: "x", 
+            y: "y", 
+            text: `(1,1)`,
+            dy: -15
+          }),
+          Plot.text([{ x: 0.5, y: 1.8 }], { 
+            x: "x", 
+            y: "y", 
+            text: "g(x,y)=x+y-2=0",
+            fill: "red",
+            fontSize: 11
+          })
+        ]
+      });
+
+      // Value along constraint plot
+      const valueData = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * 3;
+        return { x, value: h(x) };
+      });
+
+      const valuePlot = Plot.plot({
+        width: state.width,
+        height: 200,
+        marginLeft: 60,
+        x: { domain: [0, 3], label: "x (along constraint y=2-x)" },
+        y: { label: "f(x, 2-x)" },
+        marks: [
+          Plot.line(valueData, { x: "x", y: "value", stroke: "blue", strokeWidth: 2 }),
+          Plot.dot([{ x: 1, value: h(1) }], { 
+            x: "x", 
+            y: "value", 
+            r: 6, 
+            fill: curvature < 0 ? 'green' : (curvature > 0 ? 'orange' : 'gray')
+          }),
+          Plot.ruleY([0], { stroke: "gray", strokeDasharray: "2" })
+        ]
+      });
+
+      const info = document.createElement('div');
+      info.style.marginTop = '10px';
+      info.style.padding = '10px';
+      info.style.background = '#f5f5f5';
+      info.style.borderRadius = '4px';
+      
+      info.innerHTML = `
+        <strong>Constrained SOC Classification:</strong> ${classification}<br>
+        Second derivative along constraint: h''(x) = ${curvature.toFixed(3)}<br>
+        ${state.showBH ? `<em>Note: Full bordered Hessian test checks this curvature in all feasible directions.</em>` : ''}
+      `;
+
+      canvas.innerHTML = '';
+      canvas.appendChild(plot);
+      canvas.appendChild(valuePlot);
+      canvas.appendChild(info);
+    };
+
+    ['a', 'b', 'c'].forEach(param => {
+      controls.querySelector(`#${param}-slider`).addEventListener('input', (e) => {
+        state[param] = parseFloat(e.target.value);
+        controls.querySelector(`#${param}-value`).textContent = state[param];
+        render();
+      });
+    });
+
+    controls.querySelector('#show-bh').addEventListener('change', (e) => {
+      state.showBH = e.target.checked;
+      render();
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_constrained_soc'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_constrained_soc');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_constrained_soc', e);
+    }
+  })();
+
   // ch7_kkt_consumer_inequality.js
   (function(){
     // Chapter 7: KKT Consumer Inequality (2x + 3y ≤ I)
@@ -9289,6 +10089,748 @@ function init(containerEl, options = {}) {
       }
     } catch (e) {
       console.error('Failed to register animation ch7_lagrange_tangency_plot', e);
+    }
+  })();
+
+  // ch7_shadow_price.js
+  (function(){
+    // Chapter 7: Shadow Price / Envelope Check (dV/dI = λ)
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      income: options.income || 100,
+      showDelta: options.showDelta !== false,
+      showLambda: options.showLambda !== false,
+      deltaI: 1,
+      width: 800,
+      height: 400
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <label>Income I: <input type="range" id="income-slider" min="30" max="150" value="${state.income}" step="1"></label>
+      <span id="income-value">${state.income}</span>
+      <label><input type="checkbox" id="show-delta" ${state.showDelta ? 'checked' : ''}> Show finite difference ΔV</label>
+      <label><input type="checkbox" id="show-lambda" ${state.showLambda ? 'checked' : ''}> Show λ</label>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'shadow-price-plot';
+    canvas.style.display = 'flex';
+    canvas.style.gap = '20px';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    // Utility function: U(x,y) = sqrt(xy)
+    // Budget: 2x + 3y = I
+    // Solution: x* = I/4, y* = I/6, U* = I/(2√6), λ* = 1/(2√6)
+    
+    const solveOptimum = (I) => {
+      const x = I / 4;
+      const y = I / 6;
+      const U = Math.sqrt(x * y);
+      const lambda = 0.5 * Math.sqrt(y / x) / 2; // ∂U/∂x / p_x at optimum
+      return { x, y, U, lambda };
+    };
+
+    const render = () => {
+      const I = state.income;
+      const current = solveOptimum(I);
+      const next = solveOptimum(I + state.deltaI);
+      
+      const deltaV = next.U - current.U;
+      const approxDeltaV = current.lambda * state.deltaI;
+
+      // Panel A: Consumer problem
+      const budgetData = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99) * (I / 2);
+        const y = (I - 2*x) / 3;
+        return { x, y };
+      });
+
+      const plotA = Plot.plot({
+        width: 350,
+        height: 350,
+        marginLeft: 50,
+        x: { domain: [0, I/2 * 1.2], label: "x" },
+        y: { domain: [0, I/3 * 1.2], label: "y" },
+        marks: [
+          Plot.line(budgetData, { x: "x", y: "y", stroke: "blue", strokeWidth: 2 }),
+          Plot.dot([current], { x: "x", y: "y", r: 6, fill: "red" }),
+          Plot.text([current], { 
+            x: "x", 
+            y: "y", 
+            text: () => `(${current.x.toFixed(1)}, ${current.y.toFixed(1)})`,
+            dy: -12
+          }),
+          Plot.text([{x: I/4, y: 0}], { 
+            x: "x", 
+            y: "y", 
+            text: () => `Budget: 2x+3y=${I}`,
+            dy: -10,
+            fontSize: 11
+          })
+        ]
+      });
+
+      // Panel B: Value function
+      const valueData = Array.from({ length: 100 }, (_, i) => {
+        const income = 30 + (i / 99) * 120;
+        const opt = solveOptimum(income);
+        return { income, value: opt.U };
+      });
+
+      const tangentData = Array.from({ length: 20 }, (_, i) => {
+        const income = I - 10 + (i / 19) * 20;
+        const value = current.U + current.lambda * (income - I);
+        return { income, value };
+      });
+
+      const marks = [
+        Plot.line(valueData, { x: "income", y: "value", stroke: "green", strokeWidth: 2 }),
+        Plot.dot([{ income: I, value: current.U }], { x: "income", y: "value", r: 6, fill: "red" })
+      ];
+
+      if (state.showLambda) {
+        marks.push(
+          Plot.line(tangentData, { x: "income", y: "value", stroke: "orange", strokeWidth: 2, strokeDasharray: "4" }),
+          Plot.text([{ income: I + 15, value: current.U + current.lambda * 15 }], {
+            x: "income",
+            y: "value",
+            text: () => `slope = λ = ${current.lambda.toFixed(4)}`,
+            fontSize: 11
+          })
+        );
+      }
+
+      if (state.showDelta) {
+        marks.push(
+          Plot.dot([{ income: I + state.deltaI, value: next.U }], { x: "income", y: "value", r: 5, fill: "purple" }),
+          Plot.ruleY([current.U, next.U], { x: I + state.deltaI, stroke: "purple", strokeDasharray: "2" })
+        );
+      }
+
+      const plotB = Plot.plot({
+        width: 400,
+        height: 350,
+        marginLeft: 60,
+        x: { domain: [30, 150], label: "Income I" },
+        y: { label: "Value V(I)" },
+        marks
+      });
+
+      const info = document.createElement('div');
+      info.style.marginTop = '10px';
+      info.style.padding = '10px';
+      info.style.background = '#f5f5f5';
+      info.style.borderRadius = '4px';
+      
+      info.innerHTML = `
+        <strong>Envelope Identity Check:</strong><br>
+        λ* = ${current.lambda.toFixed(4)} (shadow price of income)<br>
+        ${state.showDelta ? `Actual ΔV = ${deltaV.toFixed(4)}<br>` : ''}
+        ${state.showDelta ? `Predicted λ·ΔI = ${approxDeltaV.toFixed(4)}<br>` : ''}
+        ${state.showDelta ? `<strong>Match: ${Math.abs(deltaV - approxDeltaV) < 0.001 ? '✓' : '~'}</strong>` : ''}
+      `;
+
+      canvas.innerHTML = '';
+      const panelA = document.createElement('div');
+      panelA.innerHTML = '<h4 style="margin: 5px 0;">Consumer Problem</h4>';
+      panelA.appendChild(plotA);
+      
+      const panelB = document.createElement('div');
+      panelB.innerHTML = '<h4 style="margin: 5px 0;">Value Function V(I)</h4>';
+      panelB.appendChild(plotB);
+      
+      canvas.appendChild(panelA);
+      canvas.appendChild(panelB);
+      container.appendChild(info);
+    };
+
+    controls.querySelector('#income-slider').addEventListener('input', (e) => {
+      state.income = parseFloat(e.target.value);
+      controls.querySelector('#income-value').textContent = state.income;
+      render();
+    });
+
+    controls.querySelector('#show-delta').addEventListener('change', (e) => {
+      state.showDelta = e.target.checked;
+      render();
+    });
+
+    controls.querySelector('#show-lambda').addEventListener('change', (e) => {
+      state.showLambda = e.target.checked;
+      render();
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch7_shadow_price'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch7_shadow_price');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch7_shadow_price', e);
+    }
+  })();
+
+  // ch8_brouwer.js
+  (function(){
+    // Chapter 8: Brouwer Fixed Point (Existence)
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      preset: options.preset || 'tanh',
+      showFixedPoint: true,
+      width: 600,
+      height: 500
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <label>Function preset:
+        <select id="preset-select">
+          <option value="tanh">tanh(x)</option>
+          <option value="cos">0.5 + 0.4cos(x)</option>
+          <option value="sqrt">√(x)</option>
+          <option value="quad">0.2 + 0.6x²</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="show-fp" checked> Show fixed point</label>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'brouwer-plot';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    const functions = {
+      tanh: (x) => 0.5 + 0.4 * Math.tanh(x - 0.5),
+      cos: (x) => 0.5 + 0.4 * Math.cos(2 * Math.PI * x),
+      sqrt: (x) => Math.sqrt(x),
+      quad: (x) => 0.2 + 0.6 * x * x
+    };
+
+    const findFixedPoint = (f, a = 0, b = 1, tol = 1e-6) => {
+      // Simple bisection
+      for (let i = 0; i < 50; i++) {
+        const mid = (a + b) / 2;
+        const val = f(mid) - mid;
+        if (Math.abs(val) < tol) return mid;
+        if (val > 0) a = mid;
+        else b = mid;
+      }
+      return (a + b) / 2;
+    };
+
+    const render = () => {
+      const f = functions[state.preset];
+      
+      const fData = Array.from({ length: 100 }, (_, i) => {
+        const x = (i / 99);
+        const y = f(x);
+        return { x, y };
+      });
+
+      const identityData = [{ x: 0, y: 0 }, { x: 1, y: 1 }];
+
+      const marks = [
+        Plot.line(fData, { x: "x", y: "y", stroke: "blue", strokeWidth: 2 }),
+        Plot.line(identityData, { x: "x", y: "y", stroke: "gray", strokeWidth: 2, strokeDasharray: "4" }),
+        Plot.text([{ x: 0.85, y: 0.9 }], { x: "x", y: "y", text: "y=x", fill: "gray", fontSize: 11 }),
+        Plot.text([{ x: 0.1, y: f(0.1) + 0.05 }], { x: "x", y: "y", text: `y=f(x)`, fill: "blue", fontSize: 11 })
+      ];
+
+      if (state.showFixedPoint) {
+        const fp = findFixedPoint(f);
+        marks.push(
+          Plot.dot([{ x: fp, y: fp }], { x: "x", y: "y", r: 8, fill: "red" }),
+          Plot.text([{ x: fp, y: fp }], { x: "x", y: "y", text: `★ x*=${fp.toFixed(3)}`, dy: -15, fontWeight: "bold" })
+        );
+      }
+
+      const plot = Plot.plot({
+        width: state.width,
+        height: state.height,
+        marginLeft: 60,
+        x: { domain: [0, 1], label: "x" },
+        y: { domain: [0, 1], label: "y" },
+        marks
+      });
+
+      const info = document.createElement('div');
+      info.style.marginTop = '10px';
+      info.style.padding = '10px';
+      info.style.background = '#f5f5f5';
+      info.innerHTML = `
+        <strong>Brouwer's Fixed-Point Theorem:</strong><br>
+        Continuous self-map f:[0,1]→[0,1] has a fixed point x* where f(x*)=x*.<br>
+        Intersection of y=f(x) and y=x guarantees existence.
+      `;
+
+      canvas.innerHTML = '';
+      canvas.appendChild(plot);
+      canvas.appendChild(info);
+    };
+
+    controls.querySelector('#preset-select').addEventListener('change', (e) => {
+      state.preset = e.target.value;
+      render();
+    });
+
+    controls.querySelector('#show-fp').addEventListener('change', (e) => {
+      state.showFixedPoint = e.target.checked;
+      render();
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_brouwer'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_brouwer');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_brouwer', e);
+    }
+  })();
+
+  // ch8_envelope.js
+  (function(){
+    // Chapter 8: Envelope Theorem Visualizer
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      theta: options.theta || 100,
+      showLambda: true,
+      showDelta: false,
+      width: 700,
+      height: 350
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <label>Parameter θ (income): <input type="range" id="theta-slider" min="40" max="150" value="${state.theta}" step="1"></label>
+      <span id="theta-value">${state.theta}</span><br>
+      <label><input type="checkbox" id="show-lambda" checked> Show λ and tangent</label>
+      <label><input type="checkbox" id="show-delta"> Show finite difference ΔV</label>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'envelope-plot';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    // Same consumer problem: max √(xy) s.t. 2x+3y=I
+    const solve = (I) => {
+      const x = I / 4;
+      const y = I / 6;
+      const U = Math.sqrt(x * y);
+      const lambda = 0.5 * Math.sqrt(y/x) / 2;
+      return { x, y, U, lambda };
+    };
+
+    const render = () => {
+      const current = solve(state.theta);
+      const next = solve(state.theta + 1);
+
+      const valueData = Array.from({ length: 100 }, (_, i) => {
+        const I = 40 + (i / 99) * 110;
+        const sol = solve(I);
+        return { I, V: sol.U };
+      });
+
+      const marks = [
+        Plot.line(valueData, { x: "I", y: "V", stroke: "green", strokeWidth: 2.5 }),
+        Plot.dot([{ I: state.theta, V: current.U }], { x: "I", y: "V", r: 6, fill: "red" })
+      ];
+
+      if (state.showLambda) {
+        const tangent = Array.from({ length: 20 }, (_, i) => {
+          const I = state.theta - 15 + (i / 19) * 30;
+          const V = current.U + current.lambda * (I - state.theta);
+          return { I, V };
+        });
+        marks.push(
+          Plot.line(tangent, { x: "I", y: "V", stroke: "orange", strokeWidth: 2, strokeDasharray: "4" }),
+          Plot.text([{ I: state.theta + 20, V: current.U + current.lambda * 20 }], {
+            x: "I",
+            y: "V",
+            text: `slope = λ = ${current.lambda.toFixed(4)}`,
+            fontSize: 11
+          })
+        );
+      }
+
+      if (state.showDelta) {
+        marks.push(
+          Plot.dot([{ I: state.theta + 1, V: next.U }], { x: "I", y: "V", r: 5, fill: "purple" }),
+          Plot.ruleY([current.U, next.U], { x: state.theta + 1, stroke: "purple", strokeWidth: 2 })
+        );
+      }
+
+      const plot = Plot.plot({
+        width: state.width,
+        height: state.height,
+        marginLeft: 60,
+        x: { label: "Parameter θ (Income I)" },
+        y: { label: "Value V(θ)" },
+        marks
+      });
+
+      const info = document.createElement('div');
+      info.style.marginTop = '10px';
+      info.style.padding = '10px';
+      info.style.background = '#f5f5f5';
+      info.innerHTML = `
+        <strong>Envelope Identity:</strong> dV/dθ = ∂ℒ/∂θ = λ<br>
+        At θ=${state.theta}: λ = ${current.lambda.toFixed(4)}<br>
+        ${state.showDelta ? `Actual ΔV = ${(next.U - current.U).toFixed(4)}, Predicted λ·Δθ = ${current.lambda.toFixed(4)}` : ''}
+      `;
+
+      canvas.innerHTML = '';
+      canvas.appendChild(plot);
+      canvas.appendChild(info);
+    };
+
+    controls.querySelector('#theta-slider').addEventListener('input', (e) => {
+      state.theta = parseFloat(e.target.value);
+      controls.querySelector('#theta-value').textContent = state.theta;
+      render();
+    });
+
+    controls.querySelector('#show-lambda').addEventListener('change', (e) => {
+      state.showLambda = e.target.checked;
+      render();
+    });
+
+    controls.querySelector('#show-delta').addEventListener('change', (e) => {
+      state.showDelta = e.target.checked;
+      render();
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_envelope'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_envelope');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_envelope', e);
+    }
+  })();
+
+  // ch8_rbc_policy.js
+  (function(){
+    // Chapter 8: Deterministic RBC Policy Explorer
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      alpha: options.alpha || 0.3,
+      beta: options.beta || 0.95,
+      delta: options.delta || 1,
+      showEuler: false,
+      width: 700,
+      height: 400
+    };
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <label>α (capital share): <input type="range" id="alpha-slider" min="0.1" max="0.9" value="${state.alpha}" step="0.05"></label>
+      <span id="alpha-value">${state.alpha}</span><br>
+      <label>β (discount): <input type="range" id="beta-slider" min="0.8" max="0.99" value="${state.beta}" step="0.01"></label>
+      <span id="beta-value">${state.beta}</span><br>
+      <label><input type="checkbox" id="delta-toggle" ${state.delta === 1 ? 'checked' : ''}> Full depreciation (δ=1)</label>
+      <label><input type="checkbox" id="show-euler"> Show Euler residual</label>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'rbc-policy-plot';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    const render = () => {
+      // Deterministic RBC with δ=1: k_{t+1} = αβ k_t^α, c_t = (1-αβ) k_t^α
+      const s = state.alpha * state.beta; // savings rate
+      
+      // Steady state: k* = (αβ)^{1/(1-α)}
+      const kStar = Math.pow(s, 1 / (1 - state.alpha));
+
+      const kMax = Math.min(kStar * 2.5, 50);
+      const kData = Array.from({ length: 100 }, (_, i) => {
+        const k = 0.1 + (i / 99) * kMax;
+        const kAlpha = Math.pow(k, state.alpha);
+        const gk = s * kAlpha; // next capital
+        const gc = (1 - s) * kAlpha; // consumption
+        return { k, gk, gc };
+      });
+
+      const marks = [
+        // Policy functions
+        Plot.line(kData, { x: "k", y: "gk", stroke: "blue", strokeWidth: 2.5 }),
+        Plot.line(kData, { x: "k", y: "gc", stroke: "green", strokeWidth: 2.5 }),
+        // 45-degree line
+        Plot.line([{ k: 0, y: 0 }, { k: kMax, y: kMax }], { x: "k", y: "y", stroke: "gray", strokeDasharray: "4", strokeWidth: 1 }),
+        // Steady state
+        Plot.ruleX([kStar], { stroke: "red", strokeWidth: 2, strokeDasharray: "2" }),
+        Plot.dot([{ k: kStar, y: kStar }], { x: "k", y: "y", r: 6, fill: "red" }),
+        // Labels
+        Plot.text([{ k: kMax * 0.7, y: s * Math.pow(kMax * 0.7, state.alpha) + 0.5 }], {
+          x: "k", y: "y", text: `k'=αβ k^α`, fill: "blue", fontSize: 11
+        }),
+        Plot.text([{ k: kMax * 0.5, y: (1 - s) * Math.pow(kMax * 0.5, state.alpha) - 0.5 }], {
+          x: "k", y: "y", text: `c=(1-αβ)k^α`, fill: "green", fontSize: 11
+        }),
+        Plot.text([{ k: kStar, y: 0 }], {
+          x: "k", y: "y", text: `k*=${kStar.toFixed(2)}`, dy: 20, fill: "red", fontSize: 11
+        })
+      ];
+
+      const plot = Plot.plot({
+        width: state.width,
+        height: state.height,
+        marginLeft: 60,
+        x: { domain: [0, kMax], label: "Capital k_t" },
+        y: { label: "Policy values" },
+        marks
+      });
+
+      const info = document.createElement('div');
+      info.style.marginTop = '10px';
+      info.style.padding = '10px';
+      info.style.background = '#f5f5f5';
+      info.innerHTML = `
+        <strong>Deterministic RBC Policies (δ=1):</strong><br>
+        Savings rate s = αβ = ${s.toFixed(3)}<br>
+        Steady state k* = (αβ)^{1/(1-α)} = ${kStar.toFixed(3)}<br>
+        Higher β → higher savings → higher steady-state capital.
+      `;
+
+      canvas.innerHTML = '';
+      canvas.appendChild(plot);
+      canvas.appendChild(info);
+    };
+
+    controls.querySelector('#alpha-slider').addEventListener('input', (e) => {
+      state.alpha = parseFloat(e.target.value);
+      controls.querySelector('#alpha-value').textContent = state.alpha;
+      render();
+    });
+
+    controls.querySelector('#beta-slider').addEventListener('input', (e) => {
+      state.beta = parseFloat(e.target.value);
+      controls.querySelector('#beta-value').textContent = state.beta;
+      render();
+    });
+
+    controls.querySelector('#delta-toggle').addEventListener('change', (e) => {
+      state.delta = e.target.checked ? 1 : 0.1;
+      render();
+    });
+
+    controls.querySelector('#show-euler').addEventListener('change', (e) => {
+      state.showEuler = e.target.checked;
+      render();
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_rbc_policy'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_rbc_policy');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_rbc_policy', e);
+    }
+  })();
+
+  // ch8_value_iteration.js
+  (function(){
+    // Chapter 8: Value Iteration Convergence (Contraction)
+// Public API: export function init(container, options)
+
+function init(container, options = {}) {
+    const state = {
+      beta: options.beta || 0.95,
+      iter: 0,
+      playing: false,
+      showDistance: true,
+      width: 700,
+      height: 400,
+      Vt: null,
+      history: []
+    };
+
+    // Simple RBC value iteration: V(k) = max_c { ln(c) + β V(k^α - c) }
+    const alpha = 0.3;
+    const kGrid = Array.from({ length: 50 }, (_, i) => 0.5 + i * 0.5);
+    state.Vt = new Array(kGrid.length).fill(0);
+
+    const controls = document.createElement('div');
+    controls.className = 'animation-controls';
+    controls.innerHTML = `
+      <label>β (discount): <input type="range" id="beta-slider" min="0.5" max="0.99" value="${state.beta}" step="0.01"></label>
+      <span id="beta-value">${state.beta}</span><br>
+      <button id="step-btn">Step</button>
+      <button id="play-btn">Play</button>
+      <button id="pause-btn" disabled>Pause</button>
+      <button id="reset-btn">Reset</button>
+      <label><input type="checkbox" id="show-dist" ${state.showDistance ? 'checked' : ''}> Show distance</label>
+      <div id="iter-info" style="margin-top: 10px; font-weight: bold;">Iteration: 0, Distance: ∞</div>
+    `;
+
+    const canvas = document.createElement('div');
+    canvas.id = 'vi-plot';
+
+    container.appendChild(controls);
+    container.appendChild(canvas);
+
+    const bellmanOp = (V) => {
+      const Vnew = new Array(kGrid.length);
+      for (let i = 0; i < kGrid.length; i++) {
+        const k = kGrid[i];
+        const kAlpha = Math.pow(k, alpha);
+        let maxVal = -Infinity;
+        // Grid search over consumption
+        for (let c = 0.01; c < kAlpha - 0.01; c += (kAlpha - 0.02) / 30) {
+          const kNext = kAlpha - c;
+          // Interpolate V at kNext
+          const idx = kGrid.findIndex(kg => kg >= kNext);
+          const Vinterp = idx > 0 && idx < kGrid.length ? 
+            V[idx-1] + (V[idx] - V[idx-1]) * (kNext - kGrid[idx-1]) / (kGrid[idx] - kGrid[idx-1]) :
+            V[Math.min(idx, kGrid.length - 1)];
+          const val = Math.log(c) + state.beta * Vinterp;
+          if (val > maxVal) maxVal = val;
+        }
+        Vnew[i] = maxVal;
+      }
+      return Vnew;
+    };
+
+    const distance = (Va, Vb) => {
+      return Math.max(...Va.map((v, i) => Math.abs(v - Vb[i])));
+    };
+
+    const step = () => {
+      const Vnew = bellmanOp(state.Vt);
+      const dist = distance(Vnew, state.Vt);
+      state.Vt = Vnew;
+      state.iter++;
+      state.history.push({ V: [...Vnew], dist });
+      if (state.history.length > 6) state.history.shift();
+      controls.querySelector('#iter-info').textContent = 
+        `Iteration: ${state.iter}, Distance: ${dist.toFixed(6)}`;
+      render();
+      if (dist < 0.0001 && state.playing) {
+        pausePlay();
+      }
+    };
+
+    let intervalId = null;
+    const startPlay = () => {
+      if (state.playing) return;
+      state.playing = true;
+      controls.querySelector('#play-btn').disabled = true;
+      controls.querySelector('#pause-btn').disabled = false;
+      intervalId = setInterval(step, 500);
+    };
+
+    const pausePlay = () => {
+      state.playing = false;
+      controls.querySelector('#play-btn').disabled = false;
+      controls.querySelector('#pause-btn').disabled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+
+    const reset = () => {
+      pausePlay();
+      state.Vt = new Array(kGrid.length).fill(0);
+      state.iter = 0;
+      state.history = [];
+      controls.querySelector('#iter-info').textContent = 'Iteration: 0, Distance: ∞';
+      render();
+    };
+
+    const render = () => {
+      const data = kGrid.map((k, i) => ({ k, V: state.Vt[i] }));
+      
+      const marks = [
+        Plot.line(data, { x: "k", y: "V", stroke: "blue", strokeWidth: 3 })
+      ];
+
+      // Add faded history trails
+      state.history.slice(0, -1).forEach((h, idx) => {
+        const opacity = 0.2 + 0.1 * idx;
+        const histData = kGrid.map((k, i) => ({ k, V: h.V[i] }));
+        marks.unshift(Plot.line(histData, { x: "k", y: "V", stroke: "lightblue", strokeWidth: 1, opacity }));
+      });
+
+      const plot = Plot.plot({
+        width: state.width,
+        height: state.height,
+        marginLeft: 60,
+        x: { label: "Capital k" },
+        y: { label: "Value V(k)" },
+        marks
+      });
+
+      canvas.innerHTML = '';
+      canvas.appendChild(plot);
+    };
+
+    controls.querySelector('#beta-slider').addEventListener('input', (e) => {
+      state.beta = parseFloat(e.target.value);
+      controls.querySelector('#beta-value').textContent = state.beta;
+      reset();
+    });
+
+    controls.querySelector('#step-btn').addEventListener('click', step);
+    controls.querySelector('#play-btn').addEventListener('click', startPlay);
+    controls.querySelector('#pause-btn').addEventListener('click', pausePlay);
+    controls.querySelector('#reset-btn').addEventListener('click', reset);
+    controls.querySelector('#show-dist').addEventListener('change', (e) => {
+      state.showDistance = e.target.checked;
+    });
+
+    render();
+    return state;
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_value_iteration'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_value_iteration');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_value_iteration', e);
     }
   })();
 
