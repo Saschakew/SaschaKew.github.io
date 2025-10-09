@@ -10819,6 +10819,1015 @@ function init(container, options = {}) {
     }
   })();
 
+  // ch8_dp_lab.js
+  (function(){
+    // Chapter 8: Dynamic Programming Lab — Bellman Operator, Contraction, Policies
+// Public API: export function init(container, options)
+// Interactive value iteration with policy iteration option
+
+function init(container, options = {}) {
+  const cfg = {
+    kMin: 0.5,
+    kMax: 10,
+    gridSize: 41,
+    beta: 0.95,
+    alpha: 0.36,
+    delta: 0.025,
+    A: 1.0,
+    sigma: 2.0,
+    utilityType: 'log',
+    tol: 1e-4,
+    maxIter: 1000,
+  };
+
+  const state = {
+    beta: options.beta ?? cfg.beta,
+    alpha: options.alpha ?? cfg.alpha,
+    delta: options.delta ?? cfg.delta,
+    A: options.A ?? cfg.A,
+    sigma: options.sigma ?? cfg.sigma,
+    gridSize: options.gridSize ?? cfg.gridSize,
+    utilityType: options.utilityType ?? cfg.utilityType,
+    initGuess: options.initGuess ?? 'zeros',
+    autoRun: false,
+    policyIter: false,
+    showOverlays: true,
+    logScale: false,
+    iteration: 0,
+    error: Infinity,
+    kGrid: [],
+    V: [],
+    TV: [],
+    policy: [],
+    errorHistory: [],
+    timer: null,
+  };
+
+  // Initialize grid
+  function initGrid() {
+    state.kGrid = Array.from({ length: state.gridSize }, (_, i) => 
+      cfg.kMin + (i / (state.gridSize - 1)) * (cfg.kMax - cfg.kMin)
+    );
+    
+    // Initial guess
+    if (state.initGuess === 'zeros') {
+      state.V = new Array(state.gridSize).fill(0);
+    } else if (state.initGuess === 'steady-state') {
+      const kSS = Math.pow((state.A * state.alpha) / (1/state.beta - 1 + state.delta), 1/(1-state.alpha));
+      const cSS = state.A * Math.pow(kSS, state.alpha) - state.delta * kSS;
+      const vSS = utility(cSS) / (1 - state.beta);
+      state.V = new Array(state.gridSize).fill(vSS);
+    } else {
+      state.V = Array.from({ length: state.gridSize }, () => Math.random() * 0.1);
+    }
+    
+    state.TV = [...state.V];
+    state.policy = new Array(state.gridSize).fill(0);
+    state.iteration = 0;
+    state.error = Infinity;
+    state.errorHistory = [];
+  }
+
+  // Utility function
+  function utility(c) {
+    if (c <= 0) return -1e10;
+    if (state.utilityType === 'log') {
+      return Math.log(c);
+    } else if (state.utilityType === 'crra') {
+      if (state.sigma === 1) return Math.log(c);
+      return (Math.pow(c, 1 - state.sigma) - 1) / (1 - state.sigma);
+    } else if (state.utilityType === 'quadratic') {
+      const cBar = 5;
+      return -(c - cBar) * (c - cBar);
+    }
+    return Math.log(c);
+  }
+
+  // Production function
+  function production(k) {
+    return state.A * Math.pow(k, state.alpha);
+  }
+
+  // Bellman operator
+  function applyBellman() {
+    const newV = new Array(state.gridSize);
+    const newPolicy = new Array(state.gridSize);
+    
+    for (let i = 0; i < state.gridSize; i++) {
+      const k = state.kGrid[i];
+      const maxResources = (1 - state.delta) * k + production(k);
+      
+      let maxVal = -Infinity;
+      let bestKprime = 0;
+      
+      // Grid search over k'
+      for (let j = 0; j < state.gridSize; j++) {
+        const kPrime = state.kGrid[j];
+        if (kPrime > maxResources) break;
+        
+        const c = maxResources - kPrime;
+        if (c <= 0) continue;
+        
+        const val = utility(c) + state.beta * interpolate(state.V, state.kGrid, kPrime);
+        
+        if (val > maxVal) {
+          maxVal = val;
+          bestKprime = kPrime;
+        }
+      }
+      
+      newV[i] = maxVal;
+      newPolicy[i] = maxResources - bestKprime; // consumption policy
+    }
+    
+    state.TV = newV;
+    state.policy = newPolicy;
+    
+    // Compute error
+    state.error = 0;
+    for (let i = 0; i < state.gridSize; i++) {
+      state.error = Math.max(state.error, Math.abs(state.TV[i] - state.V[i]));
+    }
+    state.errorHistory.push(state.error);
+  }
+
+  // Linear interpolation
+  function interpolate(values, grid, x) {
+    if (x <= grid[0]) return values[0];
+    if (x >= grid[grid.length - 1]) return values[values.length - 1];
+    
+    for (let i = 0; i < grid.length - 1; i++) {
+      if (x >= grid[i] && x <= grid[i + 1]) {
+        const t = (x - grid[i]) / (grid[i + 1] - grid[i]);
+        return values[i] * (1 - t) + values[i + 1] * t;
+      }
+    }
+    return values[values.length - 1];
+  }
+
+  // Step forward
+  function step() {
+    applyBellman();
+    state.V = [...state.TV];
+    state.iteration++;
+    
+    if (state.error < cfg.tol || state.iteration >= cfg.maxIter) {
+      if (state.autoRun) {
+        state.autoRun = false;
+        autoRunBtn.textContent = '▶ Auto-run';
+        if (state.timer) {
+          clearInterval(state.timer);
+          state.timer = null;
+        }
+      }
+    }
+  }
+
+  // UI
+  const controls = document.createElement('div');
+  controls.className = 'animation-controls';
+  controls.style.marginBottom = '12px';
+  controls.innerHTML = `
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">β: <input type="range" id="beta-slider" min="0.80" max="0.99" step="0.01" value="${state.beta}" style="width: 120px;"> <span id="beta-val">${state.beta}</span></label>
+      <label style="margin-right: 16px;">α: <input type="range" id="alpha-slider" min="0.20" max="0.40" step="0.01" value="${state.alpha}" style="width: 120px;"> <span id="alpha-val">${state.alpha}</span></label>
+      <label style="margin-right: 16px;">δ: <input type="range" id="delta-slider" min="0.00" max="0.10" step="0.005" value="${state.delta}" style="width: 120px;"> <span id="delta-val">${state.delta}</span></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 12px;">Utility: <select id="utility-select">
+        <option value="log" selected>log(c)</option>
+        <option value="crra">CRRA</option>
+        <option value="quadratic">Quadratic</option>
+      </select></label>
+      <label style="margin-right: 12px;">Grid size: <select id="grid-select">
+        <option value="21">21</option>
+        <option value="41" selected>41</option>
+        <option value="81">81</option>
+      </select></label>
+      <label style="margin-right: 12px;">Init: <select id="init-select">
+        <option value="zeros" selected>Zeros</option>
+        <option value="steady-state">Steady-state</option>
+        <option value="random">Random</option>
+      </select></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <button id="step-btn" style="padding: 4px 12px; margin-right: 8px;">Apply T</button>
+      <button id="auto-btn" style="padding: 4px 12px; margin-right: 8px;">▶ Auto-run</button>
+      <button id="reset-btn" style="padding: 4px 12px;">Reset</button>
+      <label style="margin-left: 16px;"><input type="checkbox" id="overlay-check" checked> Show overlays</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="log-check"> Log scale (error)</label>
+    </div>
+  `;
+
+  const statusDiv = document.createElement('div');
+  statusDiv.style.padding = '8px';
+  statusDiv.style.marginBottom = '12px';
+  statusDiv.style.background = '#e8f4f8';
+  statusDiv.style.borderRadius = '4px';
+  statusDiv.innerHTML = `<strong>Iteration:</strong> <span id="iter-display">0</span> | <strong>Error:</strong> <span id="error-display">—</span> | <strong>Status:</strong> <span id="status-badge">Initialized</span>`;
+
+  const plotsDiv = document.createElement('div');
+  plotsDiv.style.display = 'flex';
+  plotsDiv.style.gap = '16px';
+  plotsDiv.style.flexWrap = 'wrap';
+
+  const pane1 = document.createElement('div');
+  const pane2 = document.createElement('div');
+
+  plotsDiv.appendChild(pane1);
+  plotsDiv.appendChild(pane2);
+
+  container.appendChild(controls);
+  container.appendChild(statusDiv);
+  container.appendChild(plotsDiv);
+
+  // Event handlers
+  const betaSlider = controls.querySelector('#beta-slider');
+  const alphaSlider = controls.querySelector('#alpha-slider');
+  const deltaSlider = controls.querySelector('#delta-slider');
+  const utilitySelect = controls.querySelector('#utility-select');
+  const gridSelect = controls.querySelector('#grid-select');
+  const initSelect = controls.querySelector('#init-select');
+  const stepBtn = controls.querySelector('#step-btn');
+  const autoRunBtn = controls.querySelector('#auto-btn');
+  const resetBtn = controls.querySelector('#reset-btn');
+  const overlayCheck = controls.querySelector('#overlay-check');
+  const logCheck = controls.querySelector('#log-check');
+
+  betaSlider.addEventListener('input', (e) => {
+    state.beta = parseFloat(e.target.value);
+    controls.querySelector('#beta-val').textContent = state.beta.toFixed(2);
+  });
+
+  alphaSlider.addEventListener('input', (e) => {
+    state.alpha = parseFloat(e.target.value);
+    controls.querySelector('#alpha-val').textContent = state.alpha.toFixed(2);
+  });
+
+  deltaSlider.addEventListener('input', (e) => {
+    state.delta = parseFloat(e.target.value);
+    controls.querySelector('#delta-val').textContent = state.delta.toFixed(3);
+  });
+
+  utilitySelect.addEventListener('change', (e) => {
+    state.utilityType = e.target.value;
+  });
+
+  gridSelect.addEventListener('change', (e) => {
+    state.gridSize = parseInt(e.target.value);
+  });
+
+  initSelect.addEventListener('change', (e) => {
+    state.initGuess = e.target.value;
+  });
+
+  overlayCheck.addEventListener('change', (e) => {
+    state.showOverlays = e.target.checked;
+    render();
+  });
+
+  logCheck.addEventListener('change', (e) => {
+    state.logScale = e.target.checked;
+    render();
+  });
+
+  stepBtn.addEventListener('click', () => {
+    step();
+    render();
+  });
+
+  autoRunBtn.addEventListener('click', () => {
+    state.autoRun = !state.autoRun;
+    if (state.autoRun) {
+      autoRunBtn.textContent = '⏸ Stop';
+      state.timer = setInterval(() => {
+        step();
+        render();
+      }, 100);
+    } else {
+      autoRunBtn.textContent = '▶ Auto-run';
+      if (state.timer) {
+        clearInterval(state.timer);
+        state.timer = null;
+      }
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    if (state.timer) {
+      clearInterval(state.timer);
+      state.timer = null;
+    }
+    state.autoRun = false;
+    autoRunBtn.textContent = '▶ Auto-run';
+    initGrid();
+    render();
+  });
+
+  function render() {
+    // Update status
+    document.getElementById('iter-display').textContent = state.iteration;
+    document.getElementById('error-display').textContent = state.error === Infinity ? '—' : state.error.toExponential(2);
+    const statusBadge = document.getElementById('status-badge');
+    if (state.error < cfg.tol) {
+      statusBadge.textContent = 'Converged ✓';
+      statusBadge.style.color = '#060';
+    } else {
+      statusBadge.textContent = 'Running...';
+      statusBadge.style.color = '#c60';
+    }
+
+    // Pane 1: Value functions
+    const vData = state.kGrid.map((k, i) => ({ k, V: state.V[i] }));
+    const tvData = state.kGrid.map((k, i) => ({ k, TV: state.TV[i] }));
+
+    const marks1 = [
+      Plot.line(vData, { x: 'k', y: 'V', stroke: 'steelblue', strokeWidth: 2, opacity: 0.7 }),
+    ];
+
+    if (state.showOverlays && state.iteration > 0) {
+      marks1.push(Plot.line(tvData, { x: 'k', y: 'TV', stroke: 'orange', strokeWidth: 2, strokeDasharray: '4,2' }));
+    }
+
+    const plot1 = Plot.plot({
+      width: 450,
+      height: 300,
+      marginLeft: 60,
+      x: { label: 'Capital k' },
+      y: { label: 'Value V(k)' },
+      marks: marks1,
+    });
+
+    pane1.innerHTML = '<h4 style="margin: 5px 0;">Value Function V(k) and TV(k)</h4>';
+    pane1.appendChild(plot1);
+
+    // Pane 2: Error history
+    if (state.errorHistory.length > 0) {
+      const errorData = state.errorHistory.map((e, i) => ({ iter: i + 1, error: e }));
+      const marks2 = [
+        Plot.line(errorData, { 
+          x: 'iter', 
+          y: 'error', 
+          stroke: 'crimson', 
+          strokeWidth: 2 
+        }),
+        Plot.dot(errorData, { 
+          x: 'iter', 
+          y: 'error', 
+          fill: 'crimson', 
+          r: 3 
+        }),
+      ];
+
+      const plot2 = Plot.plot({
+        width: 450,
+        height: 300,
+        marginLeft: 60,
+        x: { label: 'Iteration' },
+        y: { label: 'Error ||V_{n+1} - V_n||', type: state.logScale ? 'log' : 'linear' },
+        marks: marks2,
+      });
+
+      pane2.innerHTML = '<h4 style="margin: 5px 0;">Convergence (Sup-norm Error)</h4>';
+      pane2.appendChild(plot2);
+    }
+  }
+
+  // Initialize
+  initGrid();
+  render();
+
+  return {
+    destroy() {
+      if (state.timer) clearInterval(state.timer);
+    },
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_dp_lab'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_dp_lab');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_dp_lab', e);
+    }
+  })();
+
+  // ch8_dsge_lab.js
+  (function(){
+    // Chapter 8: DSGE Methods Lab — Linearization, BK Condition, IRFs
+// Public API: export function init(container, options)
+// Interactive DSGE solver with BK check and IRF visualization
+
+function init(container, options = {}) {
+  const state = {
+    alpha: options.alpha ?? 0.36,
+    beta: options.beta ?? 0.99,
+    delta: options.delta ?? 0.025,
+    rho: options.rho ?? 0.95,
+    shockSize: options.shockSize ?? 1.0,
+    showEigenvalues: true,
+    showCoeffs: true,
+    showMatrices: false,
+    showEquations: false,
+    showShock: true,
+    autoSolve: true,
+    localOverlay: false,
+    solved: false,
+    kBar: 0,
+    cBar: 0,
+    psi: 0,
+    P: [0, 0],
+    Q: [0, 0],
+    eigenvalues: [],
+    bkStatus: '',
+    Gamma0: null,
+    Gamma1: null,
+    Gamma0Inv: null,
+    ABK: null,
+    kBarAlphaMinus1: 0,
+    showBeginCapital: false,
+    fixYScale: true,
+    baseYDomain: null,
+    lamStable: null,
+  };
+
+  // Compute steady state
+  function computeSteadyState() {
+    const { alpha, beta, delta } = state;
+    const kBarAlpha = (1/beta - 1 + delta) / alpha;
+    state.kBar = Math.pow(kBarAlpha, 1/(alpha - 1));
+    state.cBar = Math.pow(state.kBar, alpha) - delta * state.kBar;
+    state.psi = state.cBar / state.kBar;
+  }
+
+  // Solve linearized system
+  function solveSystem() {
+    computeSteadyState();
+    
+    const { alpha, beta, psi, rho } = state;
+    
+    // Gamma matrices
+    const Gamma0 = [
+      [1, psi],
+      [1 - alpha, -1]
+    ];
+    
+    const Gamma1 = [
+      [1/beta, 0],
+      [1 - alpha, -1]
+    ];
+    
+    // Invert Gamma0
+    const det0 = Gamma0[0][0] * Gamma0[1][1] - Gamma0[0][1] * Gamma0[1][0];
+    const Gamma0Inv = [
+      [Gamma0[1][1] / det0, -Gamma0[0][1] / det0],
+      [-Gamma0[1][0] / det0, Gamma0[0][0] / det0]
+    ];
+    
+    // A_BK = Gamma0^{-1} Gamma1
+    const ABK = [
+      [Gamma0Inv[0][0] * Gamma1[0][0] + Gamma0Inv[0][1] * Gamma1[1][0],
+       Gamma0Inv[0][0] * Gamma1[0][1] + Gamma0Inv[0][1] * Gamma1[1][1]],
+      [Gamma0Inv[1][0] * Gamma1[0][0] + Gamma0Inv[1][1] * Gamma1[1][0],
+       Gamma0Inv[1][0] * Gamma1[0][1] + Gamma0Inv[1][1] * Gamma1[1][1]]
+    ];
+    
+    // Compute eigenvalues
+    const trace = ABK[0][0] + ABK[1][1];
+    const det = ABK[0][0] * ABK[1][1] - ABK[0][1] * ABK[1][0];
+    const discriminant = trace * trace - 4 * det;
+    
+    if (discriminant >= 0) {
+      const lambda1 = (trace + Math.sqrt(discriminant)) / 2;
+      const lambda2 = (trace - Math.sqrt(discriminant)) / 2;
+      state.eigenvalues = [lambda1, lambda2];
+    } else {
+      // Complex eigenvalues
+      const realPart = trace / 2;
+      const imagPart = Math.sqrt(-discriminant) / 2;
+      state.eigenvalues = [
+        { real: realPart, imag: imagPart },
+        { real: realPart, imag: -imagPart }
+      ];
+    }
+    
+    // BK check: need exactly 1 eigenvalue outside unit circle
+    const outsideCount = state.eigenvalues.filter(e => {
+      if (typeof e === 'number') return Math.abs(e) > 1;
+      return Math.sqrt(e.real * e.real + e.imag * e.imag) > 1;
+    }).length;
+    
+    if (outsideCount === 1) {
+      state.bkStatus = 'unique';
+    } else if (outsideCount === 0) {
+      state.bkStatus = 'indeterminate';
+    } else {
+      state.bkStatus = 'explosive';
+    }
+    
+    // Persist matrices for rendering
+    state.Gamma0 = Gamma0;
+    state.Gamma1 = Gamma1;
+    state.Gamma0Inv = Gamma0Inv;
+    state.ABK = ABK;
+
+    // Compute decision rule coefficients from the stable eigenpair of ABK
+    const evals = state.eigenvalues.filter(e => typeof e === 'number');
+    let lamStable = null;
+    if (evals.length >= 1) {
+      const inside = evals.filter(e => Math.abs(e) < 1);
+      if (inside.length) lamStable = inside.reduce((a,b)=>Math.abs(a)<Math.abs(b)?a:b);
+      else lamStable = evals.reduce((a,b)=>Math.abs(a)<Math.abs(b)?a:b);
+    }
+    if (lamStable === null) {
+      // Fallback via trace/det
+      const trace2 = ABK[0][0] + ABK[1][1];
+      const det2 = ABK[0][0]*ABK[1][1] - ABK[0][1]*ABK[1][0];
+      const disc2 = trace2*trace2 - 4*det2;
+      if (disc2 >= 0) {
+        const l1 = (trace2 + Math.sqrt(disc2))/2;
+        const l2 = (trace2 - Math.sqrt(disc2))/2;
+        lamStable = Math.abs(l1) < Math.abs(l2) ? l1 : l2;
+      } else {
+        lamStable = 0.98;
+      }
+    }
+    // Avoid p rounding up to 1.0 due to floating error
+    if (lamStable >= 1) lamStable = 1 - 1e-6;
+    state.lamStable = lamStable;
+
+    // Eigenvector for lamStable: (ABK - λI) v = 0
+    const a = ABK[0][0] - lamStable, b = ABK[0][1], c = ABK[1][0], d = ABK[1][1] - lamStable;
+    let v1, v2;
+    if (Math.abs(b) > Math.abs(c)) { v1 = 1; v2 = (b !== 0) ? (-a/b) : 0; }
+    else { v2 = 1; v1 = (c !== 0) ? (-d/c) : 0; }
+    const ratio = (Math.abs(v1) < 1e-12) ? 0 : (v2 / v1);
+
+    // Scale so that P = [p, r] with p = lamStable and r = ratio * p
+    const p = lamStable;
+    const r = ratio * p;
+    state.P = [p, r];
+
+    // Compute Q from (ρΓ0 − Γ1) Q = Ψ − Γ0 P q, with Ψ = [k̄^{α−1}ρ, −ρ]^T and q = Q[0]
+    const kBarAlpha = Math.pow(state.kBar, alpha - 1);
+    state.kBarAlphaMinus1 = kBarAlpha;
+    const PsiVec = [kBarAlpha * rho, -rho];
+    const A2 = [
+      [rho*Gamma0[0][0] - Gamma1[0][0], rho*Gamma0[0][1] - Gamma1[0][1]],
+      [rho*Gamma0[1][0] - Gamma1[1][0], rho*Gamma0[1][1] - Gamma1[1][1]]
+    ];
+    const GP = [
+      Gamma0[0][0]*p + Gamma0[0][1]*r,
+      Gamma0[1][0]*p + Gamma0[1][1]*r,
+    ];
+    // Solve for q,s from: [A2_col1 + GP, A2_col2] * [q;s] = PsiVec
+    const M = [
+      [A2[0][0] + GP[0], A2[0][1]],
+      [A2[1][0] + GP[1], A2[1][1]],
+    ];
+    const detM = M[0][0]*M[1][1] - M[0][1]*M[1][0];
+    let q = 0, s = 0;
+    if (Math.abs(detM) > 1e-12) {
+      const invM = [[ M[1][1]/detM, -M[0][1]/detM], [ -M[1][0]/detM, M[0][0]/detM ]];
+      q = invM[0][0]*PsiVec[0] + invM[0][1]*PsiVec[1];
+      s = invM[1][0]*PsiVec[0] + invM[1][1]*PsiVec[1];
+    }
+    state.Q = [q, s];
+
+    state.solved = true;
+
+    // Anchor y-domain at shock=1 baseline for clear shock-size scaling
+    if (state.fixYScale) {
+      const prevShock = state.shockSize;
+      state.shockSize = 1.0;
+      const base = generateIRFs();
+      const allY = [
+        ...base.k.map(d => d.k),
+        ...base.c.map(d => d.c),
+      ];
+      const ymax = Math.max(...allY.map(v => Math.abs(v)), 1e-6);
+      state.baseYDomain = [-ymax, ymax];
+      state.shockSize = prevShock;
+    }
+  }
+
+  // Generate IRFs
+  function generateIRFs() {
+    if (!state.solved) return { k: [], c: [] };
+    
+    const T = 60;
+    const kIRF = new Array(T);
+    const cIRF = new Array(T);
+    const aIRF = new Array(T);
+    
+    // Initial shock
+    aIRF[0] = state.shockSize;
+    kIRF[0] = state.Q[0] * aIRF[0];
+    cIRF[0] = state.Q[1] * aIRF[0];
+    
+    for (let t = 1; t < T; t++) {
+      aIRF[t] = state.rho * aIRF[t-1];
+      kIRF[t] = state.P[0] * kIRF[t-1] + state.Q[0] * aIRF[t];
+      cIRF[t] = state.P[1] * kIRF[t-1] + state.Q[1] * aIRF[t];
+    }
+    
+    // Optionally present begin-of-period capital path (predetermined): k_bop[t] = kIRF[t-1], with k_bop[0]=0
+    const kBOP = new Array(T);
+    kBOP[0] = 0;
+    for (let t = 1; t < T; t++) kBOP[t] = kIRF[t-1];
+
+    return {
+      k: kIRF.map((v, t) => ({ t, k: v })),
+      kb: kBOP.map((v, t) => ({ t, kb: v })),
+      c: cIRF.map((v, t) => ({ t, c: v })),
+      a: aIRF.map((v, t) => ({ t, a: v })),
+    };
+  }
+
+  // UI
+  const controls = document.createElement('div');
+  controls.className = 'animation-controls';
+  controls.style.marginBottom = '12px';
+  controls.innerHTML = `
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">α: <input type="range" id="alpha-slider" min="0.25" max="0.40" step="0.01" value="${state.alpha}" style="width: 120px;"> <span id="alpha-val">${state.alpha.toFixed(2)}</span></label>
+      <label style="margin-right: 16px;">β: <input type="range" id="beta-slider" min="0.96" max="0.995" step="0.001" value="${state.beta}" style="width: 120px;"> <span id="beta-val">${state.beta.toFixed(3)}</span></label>
+      <label style="margin-right: 16px;">δ: <input type="range" id="delta-slider" min="0.01" max="0.05" step="0.005" value="${state.delta}" style="width: 120px;"> <span id="delta-val">${state.delta.toFixed(3)}</span></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">ρ: <input type="range" id="rho-slider" min="0.80" max="0.98" step="0.01" value="${state.rho}" style="width: 120px;"> <span id="rho-val">${state.rho.toFixed(2)}</span></label>
+      <label style="margin-right: 16px;">Shock size: <input type="range" id="shock-slider" min="0" max="3" step="0.1" value="${state.shockSize}" style="width: 120px;"> <span id="shock-val">${state.shockSize.toFixed(1)}σ</span></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <button id="solve-btn" style="padding: 4px 12px; margin-right: 8px; background: #28a745; color: white; border: none; cursor: pointer;">Solve</button>
+      <button id="reset-btn" style="padding: 4px 12px;">Reset</button>
+      <label style="margin-left: 16px;"><input type="checkbox" id="eigen-check" checked> Show eigenvalues</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="coeffs-check" checked> Show coefficients</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="matrices-check"> Show matrices</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="equations-check"> Show equations</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="shock-check" checked> Show shock</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="autosolve-check" checked> Auto-solve</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="begink-check" checked> Plot begin-of-period k</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="fixy-check" checked> Fix y-axis</label>
+    </div>
+  `;
+
+  const statusDiv = document.createElement('div');
+  statusDiv.style.padding = '8px';
+  statusDiv.style.marginBottom = '12px';
+  statusDiv.style.borderRadius = '4px';
+  statusDiv.id = 'status-container';
+
+  const plotsDiv = document.createElement('div');
+  plotsDiv.style.display = 'flex';
+  plotsDiv.style.gap = '16px';
+  plotsDiv.style.flexWrap = 'wrap';
+
+  const pane1 = document.createElement('div');
+  const pane2 = document.createElement('div');
+  const pane3 = document.createElement('div');
+  pane3.style.flexBasis = '100%';
+
+  plotsDiv.appendChild(pane1);
+  plotsDiv.appendChild(pane2);
+  plotsDiv.appendChild(pane3);
+
+  container.appendChild(controls);
+  container.appendChild(statusDiv);
+  container.appendChild(plotsDiv);
+
+  // Event handlers
+  const alphaSlider = controls.querySelector('#alpha-slider');
+  const betaSlider = controls.querySelector('#beta-slider');
+  const deltaSlider = controls.querySelector('#delta-slider');
+  const rhoSlider = controls.querySelector('#rho-slider');
+  const shockSlider = controls.querySelector('#shock-slider');
+  const solveBtn = controls.querySelector('#solve-btn');
+  const resetBtn = controls.querySelector('#reset-btn');
+  const eigenCheck = controls.querySelector('#eigen-check');
+  const coeffsCheck = controls.querySelector('#coeffs-check');
+  const matricesCheck = controls.querySelector('#matrices-check');
+  const equationsCheck = controls.querySelector('#equations-check');
+  const shockCheck = controls.querySelector('#shock-check');
+  const autosolveCheck = controls.querySelector('#autosolve-check');
+  const beginkCheck = controls.querySelector('#begink-check');
+  const fixyCheck = controls.querySelector('#fixy-check');
+
+  alphaSlider.addEventListener('input', (e) => {
+    state.alpha = parseFloat(e.target.value);
+    controls.querySelector('#alpha-val').textContent = state.alpha.toFixed(2);
+    if (state.autoSolve) { solveSystem(); }
+    else { state.solved = false; }
+    render();
+  });
+
+  betaSlider.addEventListener('input', (e) => {
+    state.beta = parseFloat(e.target.value);
+    controls.querySelector('#beta-val').textContent = state.beta.toFixed(3);
+    if (state.autoSolve) { solveSystem(); }
+    else { state.solved = false; }
+    render();
+  });
+
+  deltaSlider.addEventListener('input', (e) => {
+    state.delta = parseFloat(e.target.value);
+    controls.querySelector('#delta-val').textContent = state.delta.toFixed(3);
+    if (state.autoSolve) { solveSystem(); }
+    else { state.solved = false; }
+    render();
+  });
+
+  rhoSlider.addEventListener('input', (e) => {
+    state.rho = parseFloat(e.target.value);
+    controls.querySelector('#rho-val').textContent = state.rho.toFixed(2);
+    if (state.autoSolve) { solveSystem(); }
+    else { state.solved = false; }
+    render();
+  });
+
+  shockSlider.addEventListener('input', (e) => {
+    state.shockSize = parseFloat(e.target.value);
+    controls.querySelector('#shock-val').textContent = state.shockSize.toFixed(1) + 'σ';
+    if (state.solved) render();
+  });
+
+  eigenCheck.addEventListener('change', (e) => {
+    state.showEigenvalues = e.target.checked;
+    render();
+  });
+
+  coeffsCheck.addEventListener('change', (e) => {
+    state.showCoeffs = e.target.checked;
+    render();
+  });
+
+  matricesCheck.addEventListener('change', (e) => {
+    state.showMatrices = e.target.checked;
+    render();
+  });
+
+  equationsCheck.addEventListener('change', (e) => {
+    state.showEquations = e.target.checked;
+    render();
+  });
+
+  shockCheck.addEventListener('change', (e) => {
+    state.showShock = e.target.checked;
+    render();
+  });
+
+  autosolveCheck.addEventListener('change', (e) => {
+    state.autoSolve = e.target.checked;
+  });
+
+  beginkCheck.addEventListener('change', (e) => {
+    state.showBeginCapital = e.target.checked;
+    render();
+  });
+
+  fixyCheck.addEventListener('change', (e) => {
+    state.fixYScale = e.target.checked;
+    render();
+  });
+
+  solveBtn.addEventListener('click', () => {
+    solveSystem();
+    // establish a baseline y-domain at shock=1 for visual comparability
+    const prevShock = state.shockSize;
+    state.shockSize = 1.0;
+    const base = generateIRFs();
+    const allY = [
+      ...base.k.map(d => d.k),
+      ...base.c.map(d => d.c),
+    ];
+    const ymax = Math.max(...allY.map(v => Math.abs(v)), 1e-6);
+    state.baseYDomain = [-ymax, ymax];
+    state.shockSize = prevShock;
+    render();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    state.alpha = 0.36;
+    state.beta = 0.99;
+    state.delta = 0.025;
+    state.rho = 0.95;
+    state.shockSize = 1.0;
+    alphaSlider.value = state.alpha;
+    betaSlider.value = state.beta;
+    deltaSlider.value = state.delta;
+    rhoSlider.value = state.rho;
+    shockSlider.value = state.shockSize;
+    controls.querySelector('#alpha-val').textContent = state.alpha.toFixed(2);
+    controls.querySelector('#beta-val').textContent = state.beta.toFixed(3);
+    controls.querySelector('#delta-val').textContent = state.delta.toFixed(3);
+    controls.querySelector('#rho-val').textContent = state.rho.toFixed(2);
+    controls.querySelector('#shock-val').textContent = state.shockSize.toFixed(1) + 'σ';
+    state.solved = false;
+    render();
+  });
+
+  function render() {
+    // Status badge
+    if (state.solved) {
+      let bgColor, textColor, statusText;
+      if (state.bkStatus === 'unique') {
+        bgColor = '#d4edda';
+        textColor = '#155724';
+        statusText = '✓ Unique saddle-path (BK satisfied)';
+      } else if (state.bkStatus === 'indeterminate') {
+        bgColor = '#fff3cd';
+        textColor = '#856404';
+        statusText = '✗ Indeterminacy (no eigenvalue outside unit circle)';
+      } else {
+        bgColor = '#f8d7da';
+        textColor = '#721c24';
+        statusText = '✗ Explosive (too many eigenvalues outside)';
+      }
+      
+      statusDiv.style.background = bgColor;
+      statusDiv.style.color = textColor;
+      statusDiv.innerHTML = `<strong>Status:</strong> ${statusText} | <strong>Steady state:</strong> k̄ = ${state.kBar.toFixed(3)}, c̄ = ${state.cBar.toFixed(3)}`;
+    } else {
+      statusDiv.style.background = '#e7f3ff';
+      statusDiv.style.color = '#004085';
+      statusDiv.innerHTML = '<strong>Not solved yet.</strong> Adjust parameters and click "Solve".';
+    }
+
+    if (!state.solved) {
+      pane1.innerHTML = '';
+      pane2.innerHTML = '';
+      pane3.innerHTML = '';
+      return;
+    }
+
+    // Pane 1: Eigenvalue plane
+    if (state.showEigenvalues) {
+      const unitCircle = Array.from({ length: 100 }, (_, i) => {
+        const theta = (i / 99) * 2 * Math.PI;
+        return { x: Math.cos(theta), y: Math.sin(theta) };
+      });
+
+      const eigenData = state.eigenvalues.map(e => {
+        if (typeof e === 'number') {
+          return { x: e, y: 0 };
+        } else {
+          return { x: e.real, y: e.imag };
+        }
+      });
+
+      const marks = [
+        Plot.line(unitCircle, { x: 'x', y: 'y', stroke: '#aaa', strokeWidth: 1.5, strokeDasharray: '4,2' }),
+        Plot.dot(eigenData, { 
+          x: 'x', 
+          y: 'y', 
+          r: 8, 
+          fill: (d) => Math.sqrt(d.x*d.x + d.y*d.y) > 1 ? '#dc3545' : '#28a745',
+          stroke: 'white',
+          strokeWidth: 2
+        }),
+      ];
+
+      const plot1 = Plot.plot({
+        width: 350,
+        height: 350,
+        x: { domain: [-1.5, 1.5], label: 'Real' },
+        y: { domain: [-1.5, 1.5], label: 'Imaginary' },
+        marks,
+      });
+
+      pane1.innerHTML = '<h4 style="margin: 5px 0;">BK Eigenvalue Plane</h4>';
+      pane1.appendChild(plot1);
+    }
+
+    // Pane 2: Coefficients, matrices, and equations (as toggled)
+    let pane2HTML = '';
+    if (state.showCoeffs) {
+      pane2HTML += `
+        <h4 style="margin: 5px 0;">Decision Rule</h4>
+        <div style="padding: 10px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px;">
+          <strong>Linear rule:</strong> x<sub>t</sub> = P k<sub>t-1</sub> + Q A<sub>t</sub>
+          <button id="copy-pq-btn" style="float:right; padding: 2px 6px; font-size: 11px;">Copy P,Q</button>
+          <br><br>
+          <div><strong>Policy factor:</strong> p = ${state.P[0].toFixed(6)}</div>
+          <strong>P =</strong> [${state.P[0].toFixed(6)}, ${state.P[1].toFixed(6)}]<sup>T</sup><br>
+          <strong>Q =</strong> [${state.Q[0].toFixed(6)}, ${state.Q[1].toFixed(6)}]<sup>T</sup><br><br>
+          <em>k̂<sub>t</sub> = ${state.P[0].toFixed(6)} k̂<sub>t-1</sub> + ${state.Q[0].toFixed(6)} Â<sub>t</sub></em><br>
+          <em>ĉ<sub>t</sub> = ${state.P[1].toFixed(6)} k̂<sub>t-1</sub> + ${state.Q[1].toFixed(6)} Â<sub>t</sub></em>
+        </div>
+      `;
+    }
+
+    if (state.showMatrices) {
+      const fmt = (x) => (Math.abs(x) < 1e-5 ? '0.0000' : x.toFixed(4));
+      const matTable = (M) => `
+        <table style="border-collapse: collapse; font-family: monospace; font-size: 12px;">
+          ${M.map(row => `<tr>${row.map(v => `<td style=\"border:1px solid #ddd;padding:2px 6px;\">${fmt(v)}</td>`).join('')}</tr>`).join('')}
+        </table>`;
+      const eigList = Array.isArray(state.eigenvalues) ? state.eigenvalues.map(e => (typeof e === 'number' ? `${e.toFixed(4)}` : `${e.real.toFixed(4)} ${e.imag>=0?'+':''}${e.imag.toFixed(4)}i`)).join(', ') : '';
+      pane2HTML += `
+        <h4 style="margin: 10px 0 5px 0;">Matrices</h4>
+        <div style="padding: 10px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px;">
+          <div><strong>Γ₀ =</strong><br>${matTable(state.Gamma0)}</div>
+          <div style="margin-top:6px;"><strong>Γ₁ =</strong><br>${matTable(state.Gamma1)}</div>
+          <div style="margin-top:6px;"><strong>A<sub>BK</sub> = Γ₀⁻¹Γ₁ =</strong><br>${matTable(state.ABK)}</div>
+          <div style="margin-top:6px;"><strong>eigenvalues(A<sub>BK</sub>):</strong> [ ${eigList} ]</div>
+        </div>
+      `;
+    }
+
+    if (state.showEquations) {
+      const invBeta = 1/state.beta;
+      const kb = state.kBarAlphaMinus1;
+      const psi = state.psi;
+      pane2HTML += `
+        <h4 style="margin: 10px 0 5px 0;">Linearized System</h4>
+        <div style="padding: 10px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px; line-height:1.5;">
+          <div><strong>Euler:</strong> ĉ_t = E_t ĉ_{t+1} − (1−α) ( k̂_t − E_t k̂_{t+1} ) + E_t Â_{t+1}</div>
+          <div><strong>Resource:</strong> k̂_t = (1/β) k̂_{t−1} + k̄^{α−1} Â_t − ψ ĉ_t</div>
+          <div style="margin-top:6px;">At current params: 1/β = ${invBeta.toFixed(4)}, k̄^{α−1} = ${kb.toFixed(4)}, ψ = ${psi.toFixed(4)}, E_t Â_{t+1} = ${state.rho.toFixed(2)} Â_t</div>
+        </div>
+      `;
+    }
+
+    pane2.innerHTML = pane2HTML;
+    // Wire copy button if present
+    const copyBtn = pane2.querySelector('#copy-pq-btn');
+    if (copyBtn) {
+      copyBtn.onclick = () => {
+        const text = `P = [${state.P[0]}, ${state.P[1]}]^T\nQ = [${state.Q[0]}, ${state.Q[1]}]^T`;
+        try {
+          navigator.clipboard.writeText(text);
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => { copyBtn.textContent = 'Copy P,Q'; }, 1200);
+        } catch (_) {
+          // fallback
+          copyBtn.textContent = 'Copy failed';
+          setTimeout(() => { copyBtn.textContent = 'Copy P,Q'; }, 1200);
+        }
+      };
+    }
+
+    // Pane 3: IRFs
+    const irfs = generateIRFs();
+
+    const marks3 = [
+      (state.showBeginCapital
+        ? Plot.line(irfs.kb, { x: 't', y: 'kb', stroke: 'steelblue', strokeWidth: 2.5 })
+        : Plot.line(irfs.k, { x: 't', y: 'k', stroke: 'steelblue', strokeWidth: 2.5 })),
+      Plot.line(irfs.c, { x: 't', y: 'c', stroke: 'orange', strokeWidth: 2.5 }),
+      Plot.ruleY([0], { stroke: '#aaa', strokeDasharray: '2,2' }),
+    ];
+    if (state.showShock) {
+      marks3.push(Plot.line(irfs.a, { x: 't', y: 'a', stroke: '#6c757d', strokeWidth: 1.5, strokeDasharray: '4,2' }));
+    }
+
+    const yConfig = state.fixYScale && state.baseYDomain ? { domain: state.baseYDomain } : {};
+    const plot3 = Plot.plot({
+      width: 750,
+      height: 300,
+      marginLeft: 60,
+      x: { label: 'Periods' },
+      y: { label: 'Log deviation from steady state', ...yConfig },
+      color: { legend: true },
+      marks: marks3,
+    });
+
+    pane3.innerHTML = '<h4 style="margin: 5px 0;">Impulse Response Functions (IRFs)</h4>';
+    pane3.appendChild(plot3);
+
+    // Add legend manually
+    const legend = document.createElement('div');
+    legend.style.marginTop = '8px';
+    legend.innerHTML = `
+      <span style="display: inline-block; width: 20px; height: 3px; background: steelblue; margin-right: 4px;"></span> ${state.showBeginCapital ? 'Begin capital k̂<sub>t-1</sub>' : 'End capital k̂<sub>t</sub>'}
+      <span style="display: inline-block; width: 20px; height: 3px; background: orange; margin-left: 16px; margin-right: 4px;"></span> Consumption ĉ<sub>t</sub>
+      ${state.showShock ? '<span style="display: inline-block; width: 20px; height: 3px; background: #6c757d; margin-left: 16px; margin-right: 4px;"></span> Shock Â<sub>t</sub>' : ''}
+    `;
+    pane3.appendChild(legend);
+  }
+
+  // Initialize
+  render();
+
+  return {
+    destroy() {},
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_dsge_lab'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_dsge_lab');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_dsge_lab', e);
+    }
+  })();
+
   // ch8_envelope.js
   (function(){
     // Chapter 8: Envelope Theorem Visualizer
@@ -11563,20 +12572,44 @@ function init(container, options = {}) {
     container.appendChild(canvas);
 
     const render = () => {
-      // Deterministic RBC with δ=1: k_{t+1} = αβ k_t^α, c_t = (1-αβ) k_t^α
-      const s = state.alpha * state.beta; // savings rate
-      
-      // Steady state: k* = (αβ)^{1/(1-α)}
-      const kStar = Math.pow(s, 1 / (1 - state.alpha));
+      // Deterministic RBC with Cobb–Douglas f(k)=k^α and planner solution under log utility
+      // Policy with general δ in (0,1]:
+      //   k_{t+1} = αβ k_t^α + (1-δ) k_t
+      //   c_t     = (1-αβ) k_t^α
+      const s = state.alpha * state.beta; // savings rate from output
+      const delta = Math.max(1e-6, Math.min(1, state.delta));
+
+      // Steady state: δ k* = αβ (k*)^α  ⇒  k* = (αβ/δ)^{1/(1-α)}
+      const kStar = Math.pow(s / delta, 1 / (1 - state.alpha));
 
       const kMax = Math.min(kStar * 2.5, 50);
       const kData = Array.from({ length: 100 }, (_, i) => {
         const k = 0.1 + (i / 99) * kMax;
         const kAlpha = Math.pow(k, state.alpha);
-        const gk = s * kAlpha; // next capital
-        const gc = (1 - s) * kAlpha; // consumption
+        const gk = s * kAlpha + (1 - delta) * k; // next-period capital policy
+        const gc = (1 - s) * kAlpha;             // consumption policy (share of output)
         return { k, gk, gc };
       });
+
+      // Optional Euler residual (dimensionless):
+      // R(k) = 1 - β * (c_t / c_{t+1}) * (α k_{t+1}^{α-1} + 1 - δ)
+      let eulerInfo = '';
+      let eulerMarks = [];
+      if (state.showEuler) {
+        const resData = kData.map(d => {
+          const k1 = d.gk;
+          const c0 = d.gc;
+          const c1 = (1 - s) * Math.pow(k1, state.alpha);
+          const mpkNext = state.alpha * Math.pow(k1, state.alpha - 1);
+          const resid = 1 - state.beta * (c0 / c1) * (mpkNext + (1 - delta));
+          return { k: d.k, resid };
+        });
+        const maxAbs = resData.reduce((m, r) => Math.max(m, Math.abs(r.resid)), 0);
+        eulerInfo = `<br><em>Euler residual (dimensionless): max |R(k)| ≈ ${maxAbs.toExponential(2)}</em>`;
+        // Plot residual around zero as a thin orange line; it will be ~0 for the closed-form policy
+        eulerMarks.push(Plot.ruleY([0], { stroke: "#ff9800", opacity: 0.4 }));
+        eulerMarks.push(Plot.line(resData, { x: "k", y: "resid", stroke: "#ff9800", strokeWidth: 1.2 }));
+      }
 
       const marks = [
         // Policy functions
@@ -11588,15 +12621,16 @@ function init(container, options = {}) {
         Plot.ruleX([kStar], { stroke: "red", strokeWidth: 2, strokeDasharray: "2" }),
         Plot.dot([{ k: kStar, y: kStar }], { x: "k", y: "y", r: 6, fill: "red" }),
         // Labels
-        Plot.text([{ k: kMax * 0.7, y: s * Math.pow(kMax * 0.7, state.alpha) + 0.5 }], {
-          x: "k", y: "y", text: `k'=αβ k^α`, fill: "blue", fontSize: 11
+        Plot.text([{ k: kMax * 0.65, y: s * Math.pow(kMax * 0.65, state.alpha) + (1 - delta) * (kMax * 0.65) + 0.5 }], {
+          x: "k", y: "y", text: `k'=αβ k^α + (1-δ)k`, fill: "blue", fontSize: 11
         }),
-        Plot.text([{ k: kMax * 0.5, y: (1 - s) * Math.pow(kMax * 0.5, state.alpha) - 0.5 }], {
+        Plot.text([{ k: kMax * 0.45, y: (1 - s) * Math.pow(kMax * 0.45, state.alpha) - 0.5 }], {
           x: "k", y: "y", text: `c=(1-αβ)k^α`, fill: "green", fontSize: 11
         }),
         Plot.text([{ k: kStar, y: 0 }], {
           x: "k", y: "y", text: `k*=${kStar.toFixed(2)}`, dy: 20, fill: "red", fontSize: 11
-        })
+        }),
+        ...eulerMarks
       ];
 
       const plot = Plot.plot({
@@ -11604,7 +12638,7 @@ function init(container, options = {}) {
         height: state.height,
         marginLeft: 60,
         x: { domain: [0, kMax], label: "Capital k_t" },
-        y: { label: "Policy values" },
+        y: { label: "Policy / residual" },
         marks
       });
 
@@ -11613,10 +12647,18 @@ function init(container, options = {}) {
       info.style.padding = '10px';
       info.style.background = '#f5f5f5';
       info.innerHTML = `
-        <strong>Deterministic RBC Policies (δ=1):</strong><br>
-        Savings rate s = αβ = ${s.toFixed(3)}<br>
-        Steady state k* = (αβ)^{1/(1-α)} = ${kStar.toFixed(3)}<br>
-        Higher β → higher savings → higher steady-state capital.
+        <strong>Deterministic RBC Policies:</strong><br>
+        s = αβ = ${s.toFixed(3)}, δ = ${delta.toFixed(2)}<br>
+        k* = (αβ/δ)^{1/(1-α)} = ${kStar.toFixed(3)}<br>
+        c(k) = (1-αβ) k^α,  k'(k) = αβ k^α + (1-δ)k
+        ${eulerInfo}
+        <div style="margin-top:6px; font-size: 12px;">
+          <span style="display:inline-flex; align-items:center; margin-right:12px;"><span style="display:inline-block;width:10px;height:10px;background:blue;margin-right:6px;"></span>k' policy</span>
+          <span style="display:inline-flex; align-items:center; margin-right:12px;"><span style="display:inline-block;width:10px;height:10px;background:green;margin-right:6px;"></span>c policy</span>
+          <span style="display:inline-flex; align-items:center; margin-right:12px;"><span style="display:inline-block;width:10px;height:2px;background:gray;margin-right:6px;"></span>45° line</span>
+          <span style="display:inline-flex; align-items:center; margin-right:12px;"><span style="display:inline-block;width:10px;height:10px;background:red;border-radius:50%;margin-right:6px;"></span>steady state</span>
+          ${state.showEuler ? `<span style="display:inline-flex; align-items:center; margin-right:12px;"><span style="display:inline-block;width:10px;height:2px;background:#ff9800;margin-right:6px;"></span>Euler residual</span>` : ''}
+        </div>
       `;
 
       canvas.innerHTML = '';
@@ -11821,6 +12863,832 @@ function init(container, options = {}) {
       }
     } catch (e) {
       console.error('Failed to register animation ch8_value_iteration', e);
+    }
+  })();
+
+  // ch9_lln_clt_lab.js
+  (function(){
+    // Chapter 9: Sampling & Limit Theorems Lab — LLN and CLT
+// Public API: export function init(container, options)
+// Interactive demonstration of Law of Large Numbers and Central Limit Theorem
+
+function init(container, options = {}) {
+  const state = {
+    n: options.n ?? 100,
+    batches: options.batches ?? 50,
+    distribution: options.distribution ?? 'normal',
+    mu: options.mu ?? 0,
+    sigma: options.sigma ?? 1,
+    p: options.p ?? 0.5,
+    lambda: options.lambda ?? 1,
+    nu: options.nu ?? 5,
+    view: options.view ?? 'lln',
+    standardize: false,
+    samples: [],
+    means: [],
+    seed: 12345,
+  };
+
+  // Simple LCG random number generator (deterministic)
+  function random() {
+    state.seed = (state.seed * 1664525 + 1013904223) % 4294967296;
+    return state.seed / 4294967296;
+  }
+
+  function normalRandom(mu = 0, sigma = 1) {
+    const u1 = random();
+    const u2 = random();
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    return mu + sigma * z;
+  }
+
+  function generateSample() {
+    const { distribution, mu, sigma, p, lambda, nu } = state;
+    
+    if (distribution === 'normal') {
+      return normalRandom(mu, sigma);
+    } else if (distribution === 'uniform') {
+      return mu + (random() - 0.5) * sigma * Math.sqrt(12);
+    } else if (distribution === 'bernoulli') {
+      return random() < p ? 1 : 0;
+    } else if (distribution === 'exponential') {
+      return -Math.log(random()) / lambda;
+    } else if (distribution === 't') {
+      const z = normalRandom();
+      let chiSq = 0;
+      for (let i = 0; i < nu; i++) {
+        const n = normalRandom();
+        chiSq += n * n;
+      }
+      return z / Math.sqrt(chiSq / nu);
+    } else if (distribution === 'lognormal') {
+      return Math.exp(normalRandom(mu, sigma));
+    }
+    return normalRandom(mu, sigma);
+  }
+
+  function runSampling() {
+    state.samples = [];
+    state.means = [];
+    
+    for (let b = 0; b < state.batches; b++) {
+      let sum = 0;
+      for (let i = 0; i < state.n; i++) {
+        sum += generateSample();
+      }
+      const mean = sum / state.n;
+      state.means.push(mean);
+    }
+  }
+
+  // UI
+  const controls = document.createElement('div');
+  controls.className = 'animation-controls';
+  controls.style.marginBottom = '12px';
+  controls.innerHTML = `
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">View: 
+        <select id="view-select">
+          <option value="lln" selected>LLN</option>
+          <option value="clt">CLT</option>
+        </select>
+      </label>
+      <label style="margin-right: 16px;">Distribution: 
+        <select id="dist-select">
+          <option value="normal" selected>Normal(μ,σ)</option>
+          <option value="uniform">Uniform</option>
+          <option value="bernoulli">Bernoulli(p)</option>
+          <option value="exponential">Exponential(λ)</option>
+          <option value="t">t(ν)</option>
+          <option value="lognormal">Lognormal</option>
+        </select>
+      </label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">n (sample size): <input type="range" id="n-slider" min="10" max="1000" step="10" value="${state.n}" style="width: 200px;"> <span id="n-val">${state.n}</span></label>
+      <label style="margin-right: 16px;">Batches: <input type="range" id="batch-slider" min="10" max="200" step="10" value="${state.batches}" style="width: 150px;"> <span id="batch-val">${state.batches}</span></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">μ: <input type="number" id="mu-input" value="${state.mu}" step="0.5" style="width: 60px;"></label>
+      <label style="margin-right: 16px;">σ: <input type="number" id="sigma-input" value="${state.sigma}" step="0.1" min="0.1" style="width: 60px;"></label>
+      <button id="resample-btn" style="padding: 4px 12px; margin-left: 8px; background: #007bff; color: white; border: none; cursor: pointer;">Resample</button>
+      <button id="reseed-btn" style="padding: 4px 12px; margin-left: 4px;">Reseed RNG</button>
+    </div>
+  `;
+
+  const statusDiv = document.createElement('div');
+  statusDiv.style.padding = '8px';
+  statusDiv.style.marginBottom = '12px';
+  statusDiv.style.background = '#e8f4f8';
+  statusDiv.style.borderRadius = '4px';
+  statusDiv.id = 'status-display';
+
+  const plotsDiv = document.createElement('div');
+  plotsDiv.style.display = 'flex';
+  plotsDiv.style.gap = '16px';
+  plotsDiv.style.flexWrap = 'wrap';
+
+  const pane1 = document.createElement('div');
+  const pane2 = document.createElement('div');
+
+  plotsDiv.appendChild(pane1);
+  plotsDiv.appendChild(pane2);
+
+  container.appendChild(controls);
+  container.appendChild(statusDiv);
+  container.appendChild(plotsDiv);
+
+  // Event handlers
+  const viewSelect = controls.querySelector('#view-select');
+  const distSelect = controls.querySelector('#dist-select');
+  const nSlider = controls.querySelector('#n-slider');
+  const batchSlider = controls.querySelector('#batch-slider');
+  const muInput = controls.querySelector('#mu-input');
+  const sigmaInput = controls.querySelector('#sigma-input');
+  const resampleBtn = controls.querySelector('#resample-btn');
+  const reseedBtn = controls.querySelector('#reseed-btn');
+
+  viewSelect.addEventListener('change', (e) => {
+    state.view = e.target.value;
+    render();
+  });
+
+  distSelect.addEventListener('change', (e) => {
+    state.distribution = e.target.value;
+    
+    // Update defaults for specific distributions
+    if (state.distribution === 'bernoulli') {
+      state.mu = 0.5;
+      state.sigma = 0.5;
+      muInput.value = 0.5;
+      sigmaInput.value = 0.5;
+    } else if (state.distribution === 'exponential') {
+      state.mu = 1;
+      state.lambda = 1;
+      muInput.value = 1;
+    }
+    
+    runSampling();
+    render();
+  });
+
+  nSlider.addEventListener('input', (e) => {
+    state.n = parseInt(e.target.value);
+    controls.querySelector('#n-val').textContent = state.n;
+  });
+
+  batchSlider.addEventListener('input', (e) => {
+    state.batches = parseInt(e.target.value);
+    controls.querySelector('#batch-val').textContent = state.batches;
+  });
+
+  muInput.addEventListener('change', (e) => {
+    state.mu = parseFloat(e.target.value);
+  });
+
+  sigmaInput.addEventListener('change', (e) => {
+    state.sigma = parseFloat(e.target.value);
+  });
+
+  resampleBtn.addEventListener('click', () => {
+    runSampling();
+    render();
+  });
+
+  reseedBtn.addEventListener('click', () => {
+    state.seed = Math.floor(Math.random() * 1000000);
+    runSampling();
+    render();
+  });
+
+  function render() {
+    // Compute statistics
+    const sampleMean = state.means.reduce((a, b) => a + b, 0) / state.means.length;
+    const sampleVar = state.means.reduce((a, b) => a + (b - sampleMean) ** 2, 0) / state.means.length;
+    const ciWidth = 1.96 * Math.sqrt(state.sigma * state.sigma / state.n);
+    
+    // Status
+    const converged = Math.abs(sampleMean - state.mu) < 0.1;
+    statusDiv.innerHTML = `
+      <strong>Sample mean:</strong> X̄ = ${sampleMean.toFixed(4)} | 
+      <strong>Population mean:</strong> μ = ${state.mu.toFixed(2)} | 
+      <strong>Var(X̄):</strong> ${sampleVar.toFixed(4)} | 
+      <strong>CI width:</strong> ${ciWidth.toFixed(4)} | 
+      <strong>Status:</strong> ${converged ? '<span style="color: #060;">Converged ✓</span>' : '<span style="color: #c60;">Sampling...</span>'}
+    `;
+
+    if (state.view === 'lln') {
+      renderLLN();
+    } else {
+      renderCLT();
+    }
+  }
+
+  function renderLLN() {
+    // Pane 1: Running mean with CI bands
+    const runningData = state.means.map((m, i) => ({ batch: i + 1, mean: m }));
+    const ciUpper = state.mu + 1.96 * state.sigma / Math.sqrt(state.n);
+    const ciLower = state.mu - 1.96 * state.sigma / Math.sqrt(state.n);
+
+    const marks1 = [
+      Plot.ruleY([state.mu], { stroke: '#28a745', strokeWidth: 2, strokeDasharray: '4,2' }),
+      Plot.ruleY([ciUpper, ciLower], { stroke: '#90EE90', strokeWidth: 1, strokeDasharray: '2,2' }),
+      Plot.line(runningData, { x: 'batch', y: 'mean', stroke: 'steelblue', strokeWidth: 2 }),
+      Plot.dot(runningData, { x: 'batch', y: 'mean', fill: 'steelblue', r: 2 }),
+    ];
+
+    const plot1 = Plot.plot({
+      width: 450,
+      height: 300,
+      marginLeft: 60,
+      x: { label: 'Batch' },
+      y: { label: 'Sample Mean X̄' },
+      marks: marks1,
+    });
+
+    pane1.innerHTML = '<h4 style="margin: 5px 0;">LLN: Sample Mean Convergence</h4>';
+    pane1.appendChild(plot1);
+
+    // Pane 2: Scatter bands for different n
+    const nValues = [20, 100, 500];
+    const scatterData = [];
+    
+    nValues.forEach(n => {
+      for (let i = 0; i < 30; i++) {
+        let sum = 0;
+        for (let j = 0; j < n; j++) {
+          sum += generateSample();
+        }
+        scatterData.push({ n: n.toString(), mean: sum / n });
+      }
+    });
+
+    const marks2 = [
+      Plot.ruleY([state.mu], { stroke: '#28a745', strokeWidth: 2, strokeDasharray: '4,2' }),
+      Plot.dot(scatterData, { 
+        x: 'n', 
+        y: 'mean', 
+        fill: 'steelblue', 
+        r: 4,
+        opacity: 0.5
+      }),
+    ];
+
+    const plot2 = Plot.plot({
+      width: 450,
+      height: 300,
+      marginLeft: 60,
+      x: { label: 'Sample size n' },
+      y: { label: 'Sample Mean X̄' },
+      marks: marks2,
+    });
+
+    pane2.innerHTML = '<h4 style="margin: 5px 0;">Dispersion Shrinks with n</h4>';
+    pane2.appendChild(plot2);
+  }
+
+  function renderCLT() {
+    // Standardize means
+    const standardized = state.means.map(m => (m - state.mu) / (state.sigma / Math.sqrt(state.n)));
+
+    // Pane 1: Histogram with N(0,1) overlay
+    const marks1 = [
+      Plot.rectY(standardized, Plot.binX({ y: 'count' }, { x: d => d, thresholds: 20, fill: 'steelblue', opacity: 0.6 })),
+      Plot.line(
+        Array.from({ length: 100 }, (_, i) => {
+          const z = -4 + (i / 99) * 8;
+          const density = Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
+          return { z, density: density * state.batches * 0.4 }; // Scale to match histogram
+        }),
+        { x: 'z', y: 'density', stroke: 'orange', strokeWidth: 3 }
+      ),
+    ];
+
+    const plot1 = Plot.plot({
+      width: 450,
+      height: 300,
+      marginLeft: 60,
+      x: { label: 'Standardized Z = (X̄ - μ)/(σ/√n)' },
+      y: { label: 'Count' },
+      marks: marks1,
+    });
+
+    pane1.innerHTML = '<h4 style="margin: 5px 0;">CLT: Standardized Mean → N(0,1)</h4>';
+    pane1.appendChild(plot1);
+
+    // Pane 2: Q-Q plot
+    const sorted = [...standardized].sort((a, b) => a - b);
+    const qqData = sorted.map((z, i) => {
+      const p = (i + 0.5) / sorted.length;
+      const theoretical = Math.sqrt(2) * erfInv(2 * p - 1);
+      return { theoretical, observed: z };
+    });
+
+    // Compute correlation
+    const meanObs = qqData.reduce((a, b) => a + b.observed, 0) / qqData.length;
+    const meanTheo = qqData.reduce((a, b) => a + b.theoretical, 0) / qqData.length;
+    const cov = qqData.reduce((a, b) => a + (b.observed - meanObs) * (b.theoretical - meanTheo), 0);
+    const varObs = qqData.reduce((a, b) => a + (b.observed - meanObs) ** 2, 0);
+    const varTheo = qqData.reduce((a, b) => a + (b.theoretical - meanTheo) ** 2, 0);
+    const correlation = cov / Math.sqrt(varObs * varTheo);
+
+    const marks2 = [
+      Plot.line([{ x: -4, y: -4 }, { x: 4, y: 4 }], { x: 'x', y: 'y', stroke: 'orange', strokeWidth: 2, strokeDasharray: '4,2' }),
+      Plot.dot(qqData, { x: 'theoretical', y: 'observed', fill: 'steelblue', r: 4 }),
+    ];
+
+    const plot2 = Plot.plot({
+      width: 450,
+      height: 300,
+      marginLeft: 60,
+      x: { label: 'Theoretical N(0,1) quantiles' },
+      y: { label: 'Observed quantiles' },
+      marks: marks2,
+    });
+
+    pane2.innerHTML = `<h4 style="margin: 5px 0;">Q-Q Plot (r = ${correlation.toFixed(3)})</h4>`;
+    pane2.appendChild(plot2);
+  }
+
+  // Inverse error function approximation
+  function erfInv(x) {
+    const a = 0.147;
+    const b = 2 / (Math.PI * a) + Math.log(1 - x * x) / 2;
+    const sqrt1 = Math.sqrt(b * b - Math.log(1 - x * x) / a);
+    const sqrt2 = Math.sqrt(sqrt1 - b);
+    return sqrt2 * Math.sign(x);
+  }
+
+  // Initialize
+  runSampling();
+  render();
+
+  return {
+    destroy() {},
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch9_lln_clt_lab'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch9_lln_clt_lab');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch9_lln_clt_lab', e);
+    }
+  })();
+
+  // ch9_ols_projection_lab.js
+  (function(){
+    // Chapter 9: OLS Projection Geometry Lab — Projections, Residuals, Influence
+// Public API: export function init(container, options)
+// Interactive OLS visualization with geometry, leverage, and diagnostics
+
+function init(container, options = {}) {
+  const state = {
+    n: options.n ?? 50,
+    modelType: options.modelType ?? 'simple',
+    correlation: options.correlation ?? 0,
+    noise: options.noise ?? 1.0,
+    showRightAngle: true,
+    showHatDiag: false,
+    showOVB: false,
+    X: [],
+    y: [],
+    beta: [],
+    yHat: [],
+    residuals: [],
+    R2: 0,
+    hatDiag: [],
+    seed: 42,
+  };
+
+  function random() {
+    state.seed = (state.seed * 1664525 + 1013904223) % 4294967296;
+    return state.seed / 4294967296;
+  }
+
+  function normalRandom(mu = 0, sigma = 1) {
+    const u1 = random();
+    const u2 = random();
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    return mu + sigma * z;
+  }
+
+  function generateData() {
+    const { n, modelType, correlation, noise } = state;
+    state.X = [];
+    state.y = [];
+
+    if (modelType === 'simple') {
+      // y = 2 + 3*x + noise
+      for (let i = 0; i < n; i++) {
+        const x = normalRandom(0, 1);
+        const y = 2 + 3 * x + normalRandom(0, noise);
+        state.X.push([1, x]);
+        state.y.push(y);
+      }
+    } else {
+      // y = 1 + 2*x1 + 1.5*x2 + noise
+      for (let i = 0; i < n; i++) {
+        const x1 = normalRandom(0, 1);
+        const x2 = correlation * x1 + Math.sqrt(1 - correlation * correlation) * normalRandom(0, 1);
+        const y = 1 + 2 * x1 + 1.5 * x2 + normalRandom(0, noise);
+        state.X.push([1, x1, x2]);
+        state.y.push(y);
+      }
+    }
+
+    computeOLS();
+  }
+
+  function computeOLS() {
+    const { X, y } = state;
+    const n = X.length;
+    const k = X[0].length;
+
+    // X'X
+    const XtX = Array(k).fill(0).map(() => Array(k).fill(0));
+    for (let i = 0; i < k; i++) {
+      for (let j = 0; j < k; j++) {
+        for (let row = 0; row < n; row++) {
+          XtX[i][j] += X[row][i] * X[row][j];
+        }
+      }
+    }
+
+    // X'y
+    const Xty = Array(k).fill(0);
+    for (let i = 0; i < k; i++) {
+      for (let row = 0; row < n; row++) {
+        Xty[i] += X[row][i] * y[row];
+      }
+    }
+
+    // Invert X'X
+    const XtXInv = invertMatrix(XtX);
+    if (!XtXInv) {
+      console.error('Singular matrix');
+      return;
+    }
+
+    // beta = (X'X)^{-1} X'y
+    state.beta = Array(k).fill(0);
+    for (let i = 0; i < k; i++) {
+      for (let j = 0; j < k; j++) {
+        state.beta[i] += XtXInv[i][j] * Xty[j];
+      }
+    }
+
+    // Fitted values and residuals
+    state.yHat = [];
+    state.residuals = [];
+    for (let row = 0; row < n; row++) {
+      let fitted = 0;
+      for (let i = 0; i < k; i++) {
+        fitted += X[row][i] * state.beta[i];
+      }
+      state.yHat.push(fitted);
+      state.residuals.push(y[row] - fitted);
+    }
+
+    // R^2
+    const yMean = y.reduce((a, b) => a + b, 0) / n;
+    const TSS = y.reduce((a, b) => a + (b - yMean) ** 2, 0);
+    const RSS = state.residuals.reduce((a, b) => a + b * b, 0);
+    state.R2 = 1 - RSS / TSS;
+
+    // Hat matrix diagonal
+    state.hatDiag = [];
+    for (let row = 0; row < n; row++) {
+      let h = 0;
+      for (let i = 0; i < k; i++) {
+        for (let j = 0; j < k; j++) {
+          h += X[row][i] * XtXInv[i][j] * X[row][j];
+        }
+      }
+      state.hatDiag.push(h);
+    }
+  }
+
+  function invertMatrix(M) {
+    const n = M.length;
+    const I = Array(n).fill(0).map((_, i) => Array(n).fill(0).map((_, j) => i === j ? 1 : 0));
+    const A = M.map(row => [...row]);
+
+    for (let i = 0; i < n; i++) {
+      let maxRow = i;
+      for (let k = i + 1; k < n; k++) {
+        if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) {
+          maxRow = k;
+        }
+      }
+      [A[i], A[maxRow]] = [A[maxRow], A[i]];
+      [I[i], I[maxRow]] = [I[maxRow], I[i]];
+
+      if (Math.abs(A[i][i]) < 1e-10) return null;
+
+      for (let k = i + 1; k < n; k++) {
+        const c = A[k][i] / A[i][i];
+        for (let j = i; j < n; j++) {
+          A[k][j] -= c * A[i][j];
+        }
+        for (let j = 0; j < n; j++) {
+          I[k][j] -= c * I[i][j];
+        }
+      }
+    }
+
+    for (let i = n - 1; i >= 0; i--) {
+      for (let k = i - 1; k >= 0; k--) {
+        const c = A[k][i] / A[i][i];
+        for (let j = 0; j < n; j++) {
+          I[k][j] -= c * I[i][j];
+        }
+      }
+    }
+
+    for (let i = 0; i < n; i++) {
+      const c = A[i][i];
+      for (let j = 0; j < n; j++) {
+        I[i][j] /= c;
+      }
+    }
+
+    return I;
+  }
+
+  function conditionNumber() {
+    // Approximate condition number via max/min eigenvalue ratio
+    const { X } = state;
+    const n = X.length;
+    const k = X[0].length;
+    const XtX = Array(k).fill(0).map(() => Array(k).fill(0));
+    for (let i = 0; i < k; i++) {
+      for (let j = 0; j < k; j++) {
+        for (let row = 0; row < n; row++) {
+          XtX[i][j] += X[row][i] * X[row][j];
+        }
+      }
+    }
+    
+    // For 2x2 or 3x3, compute eigenvalues analytically (simplified)
+    if (k === 2) {
+      const trace = XtX[0][0] + XtX[1][1];
+      const det = XtX[0][0] * XtX[1][1] - XtX[0][1] * XtX[1][0];
+      const disc = trace * trace - 4 * det;
+      if (disc < 0) return 1;
+      const lambda1 = (trace + Math.sqrt(disc)) / 2;
+      const lambda2 = (trace - Math.sqrt(disc)) / 2;
+      return Math.abs(lambda1 / lambda2);
+    }
+    return 1; // Placeholder for k>2
+  }
+
+  // UI
+  const controls = document.createElement('div');
+  controls.className = 'animation-controls';
+  controls.style.marginBottom = '12px';
+  controls.innerHTML = `
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">Model: 
+        <select id="model-select">
+          <option value="simple" selected>y ~ x</option>
+          <option value="multiple">y ~ x1 + x2</option>
+        </select>
+      </label>
+      <label style="margin-right: 16px;">n: <input type="range" id="n-slider" min="20" max="200" step="10" value="${state.n}" style="width: 150px;"> <span id="n-val">${state.n}</span></label>
+      <label style="margin-right: 16px;">Noise σ: <input type="range" id="noise-slider" min="0.1" max="3" step="0.1" value="${state.noise}" style="width: 120px;"> <span id="noise-val">${state.noise.toFixed(1)}</span></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">Correlation (x1, x2): <input type="range" id="corr-slider" min="-0.9" max="0.9" step="0.1" value="${state.correlation}" style="width: 150px;" disabled> <span id="corr-val">${state.correlation.toFixed(1)}</span></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <button id="randomize-btn" style="padding: 4px 12px; margin-right: 8px; background: #007bff; color: white; border: none; cursor: pointer;">Randomize X</button>
+      <button id="reset-btn" style="padding: 4px 12px;">Reset</button>
+      <label style="margin-left: 16px;"><input type="checkbox" id="right-angle-check" checked> Show orthogonality</label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="hat-check"> Show leverage</label>
+    </div>
+  `;
+
+  const statusDiv = document.createElement('div');
+  statusDiv.style.padding = '8px';
+  statusDiv.style.marginBottom = '12px';
+  statusDiv.style.background = '#e8f4f8';
+  statusDiv.style.borderRadius = '4px';
+  statusDiv.id = 'status-display';
+
+  const plotsDiv = document.createElement('div');
+  plotsDiv.style.display = 'flex';
+  plotsDiv.style.gap = '16px';
+  plotsDiv.style.flexWrap = 'wrap';
+
+  const pane1 = document.createElement('div');
+  const pane2 = document.createElement('div');
+  const pane3 = document.createElement('div');
+  pane3.style.flexBasis = '100%';
+
+  plotsDiv.appendChild(pane1);
+  plotsDiv.appendChild(pane2);
+  plotsDiv.appendChild(pane3);
+
+  container.appendChild(controls);
+  container.appendChild(statusDiv);
+  container.appendChild(plotsDiv);
+
+  // Event handlers
+  const modelSelect = controls.querySelector('#model-select');
+  const nSlider = controls.querySelector('#n-slider');
+  const noiseSlider = controls.querySelector('#noise-slider');
+  const corrSlider = controls.querySelector('#corr-slider');
+  const randomizeBtn = controls.querySelector('#randomize-btn');
+  const resetBtn = controls.querySelector('#reset-btn');
+  const rightAngleCheck = controls.querySelector('#right-angle-check');
+  const hatCheck = controls.querySelector('#hat-check');
+
+  modelSelect.addEventListener('change', (e) => {
+    state.modelType = e.target.value;
+    corrSlider.disabled = state.modelType === 'simple';
+    generateData();
+    render();
+  });
+
+  nSlider.addEventListener('input', (e) => {
+    state.n = parseInt(e.target.value);
+    controls.querySelector('#n-val').textContent = state.n;
+  });
+
+  noiseSlider.addEventListener('input', (e) => {
+    state.noise = parseFloat(e.target.value);
+    controls.querySelector('#noise-val').textContent = state.noise.toFixed(1);
+  });
+
+  corrSlider.addEventListener('input', (e) => {
+    state.correlation = parseFloat(e.target.value);
+    controls.querySelector('#corr-val').textContent = state.correlation.toFixed(1);
+  });
+
+  randomizeBtn.addEventListener('click', () => {
+    generateData();
+    render();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    state.n = 50;
+    state.noise = 1.0;
+    state.correlation = 0;
+    state.modelType = 'simple';
+    nSlider.value = state.n;
+    noiseSlider.value = state.noise;
+    corrSlider.value = state.correlation;
+    modelSelect.value = 'simple';
+    corrSlider.disabled = true;
+    controls.querySelector('#n-val').textContent = state.n;
+    controls.querySelector('#noise-val').textContent = state.noise.toFixed(1);
+    controls.querySelector('#corr-val').textContent = state.correlation.toFixed(1);
+    generateData();
+    render();
+  });
+
+  rightAngleCheck.addEventListener('change', (e) => {
+    state.showRightAngle = e.target.checked;
+    render();
+  });
+
+  hatCheck.addEventListener('change', (e) => {
+    state.showHatDiag = e.target.checked;
+    render();
+  });
+
+  function render() {
+    const kappa = conditionNumber();
+    const maxH = Math.max(...state.hatDiag);
+    const rank = state.X[0].length;
+
+    statusDiv.innerHTML = `
+      <strong>R²:</strong> ${state.R2.toFixed(4)} | 
+      <strong>rank(X):</strong> ${rank} | 
+      <strong>κ(X'X):</strong> ${kappa.toFixed(2)} ${kappa > 30 ? '<span style="color: #c60;">⚠ High collinearity</span>' : ''} | 
+      <strong>max(h<sub>ii</sub>):</strong> ${maxH.toFixed(3)}
+    `;
+
+    // Pane 1: Scatter + fit
+    if (state.modelType === 'simple') {
+      const scatterData = state.X.map((x, i) => ({ x: x[1], y: state.y[i], yHat: state.yHat[i], h: state.hatDiag[i] }));
+      const fitLine = [
+        { x: Math.min(...scatterData.map(d => d.x)), yHat: state.beta[0] + state.beta[1] * Math.min(...scatterData.map(d => d.x)) },
+        { x: Math.max(...scatterData.map(d => d.x)), yHat: state.beta[0] + state.beta[1] * Math.max(...scatterData.map(d => d.x)) },
+      ];
+
+      const marks1 = [
+        Plot.line(fitLine, { x: 'x', y: 'yHat', stroke: 'orange', strokeWidth: 3 }),
+        Plot.dot(scatterData, { 
+          x: 'x', 
+          y: 'y', 
+          fill: state.showHatDiag ? (d => d.h > 2 * rank / state.n ? '#dc3545' : 'steelblue') : 'steelblue',
+          r: 5,
+          opacity: 0.7
+        }),
+      ];
+
+      const plot1 = Plot.plot({
+        width: 450,
+        height: 300,
+        marginLeft: 60,
+        x: { label: 'x' },
+        y: { label: 'y' },
+        marks: marks1,
+      });
+
+      pane1.innerHTML = '<h4 style="margin: 5px 0;">Data & OLS Fit</h4>';
+      pane1.appendChild(plot1);
+    } else {
+      pane1.innerHTML = '<h4 style="margin: 5px 0;">Multiple Regression (2D projection)</h4><p style="font-size: 12px; color: #666;">Full 3D geometry not shown. See residual plot.</p>';
+    }
+
+    // Pane 2: Residuals vs fitted
+    const residData = state.yHat.map((yh, i) => ({ yHat: yh, resid: state.residuals[i] }));
+
+    const marks2 = [
+      Plot.ruleY([0], { stroke: '#28a745', strokeWidth: 2, strokeDasharray: '4,2' }),
+      Plot.dot(residData, { x: 'yHat', y: 'resid', fill: 'steelblue', r: 4, opacity: 0.7 }),
+    ];
+
+    if (state.showRightAngle) {
+      // Add text annotation
+      marks2.push(
+        Plot.text([{ x: (Math.min(...state.yHat) + Math.max(...state.yHat)) / 2, y: Math.max(...state.residuals) * 0.8 }], {
+          x: 'x',
+          y: 'y',
+          text: () => "X'u = 0 ✓",
+          fill: '#28a745',
+          fontSize: 14,
+          fontWeight: 'bold',
+        })
+      );
+    }
+
+    const plot2 = Plot.plot({
+      width: 450,
+      height: 300,
+      marginLeft: 60,
+      x: { label: 'Fitted ŷ' },
+      y: { label: 'Residuals u' },
+      marks: marks2,
+    });
+
+    pane2.innerHTML = '<h4 style="margin: 5px 0;">Residuals vs Fitted</h4>';
+    pane2.appendChild(plot2);
+
+    // Pane 3: Leverage bar chart
+    if (state.showHatDiag) {
+      const leverageData = state.hatDiag.map((h, i) => ({ obs: i + 1, h }));
+      const threshold = 2 * rank / state.n;
+
+      const marks3 = [
+        Plot.ruleY([threshold], { stroke: '#dc3545', strokeWidth: 2, strokeDasharray: '4,2' }),
+        Plot.barY(leverageData, { 
+          x: 'obs', 
+          y: 'h', 
+          fill: (d) => d.h > threshold ? '#dc3545' : 'steelblue',
+          opacity: 0.7
+        }),
+      ];
+
+      const plot3 = Plot.plot({
+        width: 750,
+        height: 250,
+        marginLeft: 60,
+        x: { label: 'Observation' },
+        y: { label: 'Leverage h_ii' },
+        marks: marks3,
+      });
+
+      pane3.innerHTML = `<h4 style="margin: 5px 0;">Leverage (Hat Matrix Diagonal)</h4><p style="font-size: 12px; color: #666;">Red line: threshold 2k/n = ${threshold.toFixed(3)}</p>`;
+      pane3.appendChild(plot3);
+    } else {
+      pane3.innerHTML = '';
+    }
+  }
+
+  // Initialize
+  generateData();
+  render();
+
+  return {
+    destroy() {},
+  };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch9_ols_projection_lab'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch9_ols_projection_lab');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch9_ols_projection_lab', e);
     }
   })();
 

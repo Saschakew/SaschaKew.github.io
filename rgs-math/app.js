@@ -1232,7 +1232,12 @@ this.currentChapter = chapterIndex;
                         'ch8_rbc_policy': 'ch8_rbc_policy',
                         // Chapter 8 interactive explorers
                         'ch8_envelope_tangent_check': 'ch8_envelope_tangent_check',
-                        'ch8_maximum_continuity': 'ch8_maximum_continuity'
+                        'ch8_maximum_continuity': 'ch8_maximum_continuity',
+                        'ch8_dp_lab': 'ch8_dp_lab',
+                        'ch8_dsge_lab': 'ch8_dsge_lab',
+                        // Chapter 9 labs
+                        'ch9_lln_clt_lab': 'ch9_lln_clt_lab',
+                        'ch9_ols_projection_lab': 'ch9_ols_projection_lab'
                     };
                     // Prefer alias if defined to avoid wrapper modules that try dynamic import in frozen builds
                     const mappedId = alias[id] || id;
@@ -1334,6 +1339,19 @@ this.currentChapter = chapterIndex;
                         // Dynamic import removed for static build
                         break;
                     case 'ch8_rbc_policy':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch8_dp_lab':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch8_dsge_lab':
+                        // Dynamic import removed for static build
+                        break;
+                    // Chapter 9 interactive labs
+                    case 'ch9_lln_clt_lab':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch9_ols_projection_lab':
                         // Dynamic import removed for static build
                         break;
                     // Chapter 4 interactive figures
