@@ -1235,6 +1235,7 @@ this.currentChapter = chapterIndex;
                         'ch8_maximum_continuity': 'ch8_maximum_continuity',
                         'ch8_dp_lab': 'ch8_dp_lab',
                         'ch8_dsge_lab': 'ch8_dsge_lab',
+                        'ch8_saddle_path_viz' : 'ch8_saddle_path_viz',
                         // Chapter 9 labs
                         'ch9_lln_clt_lab': 'ch9_lln_clt_lab',
                         'ch9_ols_projection_lab': 'ch9_ols_projection_lab'
@@ -1345,6 +1346,9 @@ this.currentChapter = chapterIndex;
                         // Dynamic import removed for static build
                         break;
                     case 'ch8_dsge_lab':
+                        // Dynamic import removed for static build
+                        break;
+                    case 'ch8_saddle_path_viz':
                         // Dynamic import removed for static build
                         break;
                     // Chapter 9 interactive labs

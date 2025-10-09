@@ -11272,12 +11272,12 @@ function init(container, options = {}) {
     // Gamma matrices
     const Gamma0 = [
       [1, psi],
-      [1 - alpha, -1]
+      [1 - alpha, 1]
     ];
     
     const Gamma1 = [
       [1/beta, 0],
-      [1 - alpha, -1]
+      [1 - alpha, 1]
     ];
     
     // Invert Gamma0
@@ -11334,68 +11334,30 @@ function init(container, options = {}) {
     state.Gamma0Inv = Gamma0Inv;
     state.ABK = ABK;
 
-    // Compute decision rule coefficients from the stable eigenpair of ABK
+    // Closed-form coefficients (slide-consistent)
+    const invBeta = 1 / beta;
+    const D = 1 - psi * (1 - alpha);
+    // k̄^{α−1} from steady state: α k̄^{α−1} = 1/β − 1 + δ ⇒ k̄^{α−1} = (1/β − 1 + δ)/α
+    const kBarAlphaMinus1 = (invBeta - 1 + state.delta) / alpha;
+    state.kBarAlphaMinus1 = kBarAlphaMinus1;
+
+    const p = invBeta / D;
+    const r = -(1 - alpha) * p;
+    const q = (kBarAlphaMinus1 - psi * (rho / (1 - rho))) / D;
+    const s = -(1 - alpha) * q + (rho / (1 - rho));
+
+    state.P = [p, r];
+    state.Q = [q, s];
+
+    // Stable eigenvalue for display/BK panel only
     const evals = state.eigenvalues.filter(e => typeof e === 'number');
     let lamStable = null;
-    if (evals.length >= 1) {
+    if (evals.length) {
       const inside = evals.filter(e => Math.abs(e) < 1);
-      if (inside.length) lamStable = inside.reduce((a,b)=>Math.abs(a)<Math.abs(b)?a:b);
-      else lamStable = evals.reduce((a,b)=>Math.abs(a)<Math.abs(b)?a:b);
+      lamStable = inside.length ? inside.reduce((a,b)=>Math.abs(a)<Math.abs(b)?a:b)
+                                : evals.reduce((a,b)=>Math.abs(a)<Math.abs(b)?a:b);
     }
-    if (lamStable === null) {
-      // Fallback via trace/det
-      const trace2 = ABK[0][0] + ABK[1][1];
-      const det2 = ABK[0][0]*ABK[1][1] - ABK[0][1]*ABK[1][0];
-      const disc2 = trace2*trace2 - 4*det2;
-      if (disc2 >= 0) {
-        const l1 = (trace2 + Math.sqrt(disc2))/2;
-        const l2 = (trace2 - Math.sqrt(disc2))/2;
-        lamStable = Math.abs(l1) < Math.abs(l2) ? l1 : l2;
-      } else {
-        lamStable = 0.98;
-      }
-    }
-    // Avoid p rounding up to 1.0 due to floating error
-    if (lamStable >= 1) lamStable = 1 - 1e-6;
     state.lamStable = lamStable;
-
-    // Eigenvector for lamStable: (ABK - λI) v = 0
-    const a = ABK[0][0] - lamStable, b = ABK[0][1], c = ABK[1][0], d = ABK[1][1] - lamStable;
-    let v1, v2;
-    if (Math.abs(b) > Math.abs(c)) { v1 = 1; v2 = (b !== 0) ? (-a/b) : 0; }
-    else { v2 = 1; v1 = (c !== 0) ? (-d/c) : 0; }
-    const ratio = (Math.abs(v1) < 1e-12) ? 0 : (v2 / v1);
-
-    // Scale so that P = [p, r] with p = lamStable and r = ratio * p
-    const p = lamStable;
-    const r = ratio * p;
-    state.P = [p, r];
-
-    // Compute Q from (ρΓ0 − Γ1) Q = Ψ − Γ0 P q, with Ψ = [k̄^{α−1}ρ, −ρ]^T and q = Q[0]
-    const kBarAlpha = Math.pow(state.kBar, alpha - 1);
-    state.kBarAlphaMinus1 = kBarAlpha;
-    const PsiVec = [kBarAlpha * rho, -rho];
-    const A2 = [
-      [rho*Gamma0[0][0] - Gamma1[0][0], rho*Gamma0[0][1] - Gamma1[0][1]],
-      [rho*Gamma0[1][0] - Gamma1[1][0], rho*Gamma0[1][1] - Gamma1[1][1]]
-    ];
-    const GP = [
-      Gamma0[0][0]*p + Gamma0[0][1]*r,
-      Gamma0[1][0]*p + Gamma0[1][1]*r,
-    ];
-    // Solve for q,s from: [A2_col1 + GP, A2_col2] * [q;s] = PsiVec
-    const M = [
-      [A2[0][0] + GP[0], A2[0][1]],
-      [A2[1][0] + GP[1], A2[1][1]],
-    ];
-    const detM = M[0][0]*M[1][1] - M[0][1]*M[1][0];
-    let q = 0, s = 0;
-    if (Math.abs(detM) > 1e-12) {
-      const invM = [[ M[1][1]/detM, -M[0][1]/detM], [ -M[1][0]/detM, M[0][0]/detM ]];
-      q = invM[0][0]*PsiVec[0] + invM[0][1]*PsiVec[1];
-      s = invM[1][0]*PsiVec[0] + invM[1][1]*PsiVec[1];
-    }
-    state.Q = [q, s];
 
     state.solved = true;
 
@@ -11422,11 +11384,17 @@ function init(container, options = {}) {
     const kIRF = new Array(T);
     const cIRF = new Array(T);
     const aIRF = new Array(T);
-    
-    // Initial shock
-    aIRF[0] = state.shockSize;
-    kIRF[0] = state.Q[0] * aIRF[0];
-    cIRF[0] = state.Q[1] * aIRF[0];
+
+    // Initial shock and saddle-path initial condition for k_{-1}
+    const A0 = state.shockSize;
+    const p = state.P[0], r = state.P[1];
+    const q = state.Q[0], s = state.Q[1];
+    const denom = (Math.abs(p - state.rho) < 1e-12) ? 0 : (p - state.rho);
+    const kMinus1Star = denom === 0 ? 0 : (- q / denom) * A0;
+
+    aIRF[0] = A0;
+    kIRF[0] = p * kMinus1Star + q * A0;
+    cIRF[0] = r * kMinus1Star + s * A0;
     
     for (let t = 1; t < T; t++) {
       aIRF[t] = state.rho * aIRF[t-1];
@@ -11436,7 +11404,7 @@ function init(container, options = {}) {
     
     // Optionally present begin-of-period capital path (predetermined): k_bop[t] = kIRF[t-1], with k_bop[0]=0
     const kBOP = new Array(T);
-    kBOP[0] = 0;
+    kBOP[0] = kMinus1Star;
     for (let t = 1; t < T; t++) kBOP[t] = kIRF[t-1];
 
     return {
@@ -12700,6 +12668,284 @@ function init(container, options = {}) {
       }
     } catch (e) {
       console.error('Failed to register animation ch8_rbc_policy', e);
+    }
+  })();
+
+  // ch8_saddle_path_viz.js
+  (function(){
+    // Chapter 8: Saddle-Path Selection — Visualization
+// Public API: export function init(container, options)
+// Visualizes bounded IRFs via saddle-path initial condition vs naive IRFs
+
+function init(container, options = {}) {
+  const state = {
+    alpha: options.alpha ?? 0.36,
+    beta: options.beta ?? 0.99,
+    delta: options.delta ?? 0.025,
+    rho: options.rho ?? 0.95,
+    shockSize: options.shockSize ?? 1.0,
+    T: options.T ?? 60,
+    fixYScale: true,
+    showShock: true,
+    showNaive: true,
+    showSaddle: true,
+    baseYDomain: null,
+  };
+
+  function computeParams() {
+    const { alpha, beta, delta, rho } = state;
+    const invBeta = 1 / beta;
+    // k̄^{α−1} = (1/β − 1 + δ)/α
+    const kBarAlphaMinus1 = (invBeta - 1 + delta) / alpha;
+    // ψ = c̄/k̄ = k̄^{α−1} − δ
+    const psi = kBarAlphaMinus1 - delta;
+    const D = 1 - psi * (1 - alpha);
+
+    const p = invBeta / D;
+    const r = -(1 - alpha) * p;
+    const q = (kBarAlphaMinus1 - psi * (rho / (1 - rho))) / D;
+    const s = -(1 - alpha) * q + (rho / (1 - rho));
+
+    // Saddle-path initial condition for a unit shock
+    const denom = (Math.abs(p - rho) < 1e-12) ? 0 : (p - rho);
+    const kMinus1StarPerUnitShock = denom === 0 ? 0 : (- q / denom);
+
+    return { invBeta, kBarAlphaMinus1, psi, D, p, r, q, s, kMinus1StarPerUnitShock };
+  }
+
+  function generateIRFs(kind) {
+    const { T, rho, shockSize } = state;
+    const { p, r, q, s, kMinus1StarPerUnitShock } = computeParams();
+
+    const k = new Array(T);
+    const c = new Array(T);
+    const a = new Array(T);
+
+    const A0 = shockSize;
+    let k_bop0 = 0; // begin-of-period capital at t=0
+    if (kind === 'saddle') {
+      k_bop0 = kMinus1StarPerUnitShock * A0;
+    }
+
+    a[0] = A0;
+    k[0] = p * k_bop0 + q * a[0];
+    c[0] = r * k_bop0 + s * a[0];
+
+    for (let t = 1; t < T; t++) {
+      a[t] = rho * a[t - 1];
+      // k_bop at t is k[t-1]
+      k[t] = p * k[t - 1] + q * a[t];
+      c[t] = r * k[t - 1] + s * a[t];
+    }
+
+    // begin-of-period capital series (predetermined)
+    const kb = new Array(T);
+    kb[0] = k_bop0;
+    for (let t = 1; t < T; t++) kb[t] = k[t - 1];
+
+    return {
+      k: k.map((v, t) => ({ t, k: v })),
+      c: c.map((v, t) => ({ t, c: v })),
+      a: a.map((v, t) => ({ t, a: v })),
+      kb: kb.map((v, t) => ({ t, kb: v })),
+    };
+  }
+
+  // UI container
+  const controls = document.createElement('div');
+  controls.className = 'animation-controls';
+  controls.style.marginBottom = '12px';
+  controls.innerHTML = `
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">α: <input type="range" id="alpha-slider" min="0.25" max="0.40" step="0.01" value="${state.alpha}" style="width: 120px;"> <span id="alpha-val">${state.alpha.toFixed(2)}</span></label>
+      <label style="margin-right: 16px;">β: <input type="range" id="beta-slider" min="0.96" max="0.995" step="0.001" value="${state.beta}" style="width: 120px;"> <span id="beta-val">${state.beta.toFixed(3)}</span></label>
+      <label style="margin-right: 16px;">δ: <input type="range" id="delta-slider" min="0.01" max="0.05" step="0.005" value="${state.delta}" style="width: 120px;"> <span id="delta-val">${state.delta.toFixed(3)}</span></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <label style="margin-right: 16px;">ρ: <input type="range" id="rho-slider" min="0.80" max="0.98" step="0.01" value="${state.rho}" style="width: 120px;"> <span id="rho-val">${state.rho.toFixed(2)}</span></label>
+      <label style="margin-right: 16px;">Shock size: <input type="range" id="shock-slider" min="0" max="3" step="0.1" value="${state.shockSize}" style="width: 120px;"> <span id="shock-val">${state.shockSize.toFixed(1)}σ</span></label>
+      <label style="margin-right: 16px;">Horizon T: <input type="range" id="T-slider" min="20" max="120" step="5" value="${state.T}" style="width: 120px;"> <span id="T-val">${state.T}</span></label>
+    </div>
+    <div style="margin-bottom: 8px;">
+      <button id="solve-btn" style="padding: 4px 12px; margin-right: 8px; background: #28a745; color: white; border: none; cursor: pointer;">Update</button>
+      <label style="margin-left: 8px;"><input type="checkbox" id="show-saddle" checked> Show saddle-path IRFs</label>
+      <label style="margin-left: 8px;"><input type="checkbox" id="show-naive" checked> Show naive IRFs</label>
+      <label style="margin-left: 8px;"><input type="checkbox" id="show-shock" checked> Show shock</label>
+      <label style="margin-left: 8px;"><input type="checkbox" id="fixy-check" checked> Fix y-axis</label>
+    </div>
+  `;
+
+  const statusDiv = document.createElement('div');
+  statusDiv.style.padding = '8px';
+  statusDiv.style.marginBottom = '12px';
+  statusDiv.style.borderRadius = '4px';
+
+  const plotDiv = document.createElement('div');
+
+  container.appendChild(controls);
+  container.appendChild(statusDiv);
+  container.appendChild(plotDiv);
+
+  // Handlers
+  const alphaSlider = controls.querySelector('#alpha-slider');
+  const betaSlider = controls.querySelector('#beta-slider');
+  const deltaSlider = controls.querySelector('#delta-slider');
+  const rhoSlider = controls.querySelector('#rho-slider');
+  const shockSlider = controls.querySelector('#shock-slider');
+  const TSlider = controls.querySelector('#T-slider');
+  const solveBtn = controls.querySelector('#solve-btn');
+  const showSaddleCheck = controls.querySelector('#show-saddle');
+  const showNaiveCheck = controls.querySelector('#show-naive');
+  const showShockCheck = controls.querySelector('#show-shock');
+  const fixyCheck = controls.querySelector('#fixy-check');
+
+  function refreshParamsFromUI() {
+    state.alpha = parseFloat(alphaSlider.value);
+    state.beta = parseFloat(betaSlider.value);
+    state.delta = parseFloat(deltaSlider.value);
+    state.rho = parseFloat(rhoSlider.value);
+    state.shockSize = parseFloat(shockSlider.value);
+    state.T = parseInt(TSlider.value, 10);
+    controls.querySelector('#alpha-val').textContent = state.alpha.toFixed(2);
+    controls.querySelector('#beta-val').textContent = state.beta.toFixed(3);
+    controls.querySelector('#delta-val').textContent = state.delta.toFixed(3);
+    controls.querySelector('#rho-val').textContent = state.rho.toFixed(2);
+    controls.querySelector('#shock-val').textContent = state.shockSize.toFixed(1) + 'σ';
+    controls.querySelector('#T-val').textContent = state.T;
+    state.showSaddle = showSaddleCheck.checked;
+    state.showNaive = showNaiveCheck.checked;
+    state.showShock = showShockCheck.checked;
+    state.fixYScale = fixyCheck.checked;
+  }
+
+  alphaSlider.addEventListener('input', refreshAndRender);
+  betaSlider.addEventListener('input', refreshAndRender);
+  deltaSlider.addEventListener('input', refreshAndRender);
+  rhoSlider.addEventListener('input', refreshAndRender);
+  shockSlider.addEventListener('input', () => { refreshParamsFromUI(); render(); });
+  TSlider.addEventListener('input', () => { refreshParamsFromUI(); render(); });
+  showSaddleCheck.addEventListener('change', () => { refreshParamsFromUI(); render(); });
+  showNaiveCheck.addEventListener('change', () => { refreshParamsFromUI(); render(); });
+  showShockCheck.addEventListener('change', () => { refreshParamsFromUI(); render(); });
+  fixyCheck.addEventListener('change', () => { refreshParamsFromUI(); render(); });
+  solveBtn.addEventListener('click', () => { refreshParamsFromUI(); render(true); });
+
+  function refreshAndRender() {
+    refreshParamsFromUI();
+    render();
+  }
+
+  function render(rebaseline = false) {
+    const { p, r, q, s, psi, D, kMinus1StarPerUnitShock, kBarAlphaMinus1, invBeta } = computeParams();
+
+    // IRFs
+    const irfSaddle = generateIRFs('saddle');
+    const irfNaive = generateIRFs('naive');
+
+    // Status panel
+    statusDiv.style.background = '#f8f9fa';
+    statusDiv.style.color = '#212529';
+    statusDiv.innerHTML = `
+      <div style="font-family: monospace; font-size: 12px; line-height:1.5;">
+        <strong>Parameters:</strong> 1/β=${invBeta.toFixed(4)}, k̄^{α−1}=${kBarAlphaMinus1.toFixed(4)}, ψ=${psi.toFixed(4)}, D=${D.toFixed(4)}, ρ=${state.rho.toFixed(2)}<br>
+        <strong>Policy coeffs:</strong> p=${p.toFixed(6)}, r=${r.toFixed(6)}, q=${q.toFixed(6)}, s=${s.toFixed(6)}<br>
+        <strong>Saddle-path condition:</strong> k̂_{-1}^{*} = ${(-q/(p - state.rho)).toFixed(6)} × shock  (formula: −q/(p−ρ))
+      </div>
+    `;
+
+    // Baseline y-domain for comparability at shock=1
+    if (rebaseline || state.baseYDomain === null) {
+      const prevShock = state.shockSize;
+      state.shockSize = 1.0;
+      const baseS = generateIRFs('saddle');
+      const baseN = generateIRFs('naive');
+      const allY = [
+        ...baseS.k.map(d => d.k),
+        ...baseS.c.map(d => d.c),
+        ...baseN.k.map(d => d.k),
+        ...baseN.c.map(d => d.c),
+      ];
+      const ymax = Math.max(1e-6, ...allY.map(v => Math.abs(v)));
+      state.baseYDomain = [-ymax, ymax];
+      state.shockSize = prevShock;
+    }
+
+    // Plot
+    const marks = [];
+
+    if (state.showSaddle) {
+      marks.push(
+        Plot.line(irfSaddle.k, { x: 't', y: 'k', stroke: 'steelblue', strokeWidth: 2.5 }),
+        Plot.line(irfSaddle.c, { x: 't', y: 'c', stroke: 'orange', strokeWidth: 2.5 })
+      );
+    }
+    if (state.showNaive) {
+      marks.push(
+        Plot.line(irfNaive.k, { x: 't', y: 'k', stroke: 'steelblue', strokeWidth: 2, strokeDasharray: '6,3' }),
+        Plot.line(irfNaive.c, { x: 't', y: 'c', stroke: 'orange', strokeWidth: 2, strokeDasharray: '6,3' })
+      );
+    }
+    if (state.showShock) {
+      marks.push(Plot.line(irfSaddle.a, { x: 't', y: 'a', stroke: '#6c757d', strokeWidth: 1.5, strokeDasharray: '4,2' }));
+    }
+    marks.push(Plot.ruleY([0], { stroke: '#aaa', strokeDasharray: '2,2' }));
+
+    const yConfig = state.fixYScale && state.baseYDomain ? { domain: state.baseYDomain } : {};
+    const plot = Plot.plot({
+      width: 900,
+      height: 320,
+      marginLeft: 60,
+      x: { label: 'Periods' },
+      y: { label: 'Log deviation from steady state', ...yConfig },
+      marks,
+    });
+
+    plotDiv.innerHTML = '<h4 style="margin: 5px 0;">Saddle-Path vs Naive IRFs</h4>';
+    plotDiv.appendChild(plot);
+
+    // Legend
+    const legend = document.createElement('div');
+    legend.style.marginTop = '8px';
+    legend.innerHTML = `
+      <div style="font-size:12px;">
+        <span style="display:inline-block;width:20px;height:3px;background:steelblue;margin-right:4px;"></span> k̂ (saddle)
+        <span style="display:inline-block;width:20px;height:3px;background:orange;margin-left:16px;margin-right:4px;"></span> ĉ (saddle)
+        <span style="display:inline-block;width:20px;height:3px;background:steelblue;margin-left:16px;margin-right:4px;border-bottom:2px dashed steelblue;"></span> k̂ (naive)
+        <span style="display:inline-block;width:20px;height:3px;background:orange;margin-left:16px;margin-right:4px;border-bottom:2px dashed orange;"></span> ĉ (naive)
+        ${state.showShock ? '<span style="display:inline-block;width:20px;height:3px;background:#6c757d;margin-left:16px;margin-right:4px;"></span> Â' : ''}
+      </div>
+    `;
+    plotDiv.appendChild(legend);
+
+    // Info panel (optional): formula box
+    const info = document.createElement('div');
+    info.style.marginTop = '10px';
+    info.style.fontFamily = 'monospace';
+    info.style.fontSize = '12px';
+    info.style.lineHeight = '1.5';
+    info.innerHTML = `
+      <div><strong>Simulation rule:</strong> k̂_t = p·k̂_{t-1} + q·Â_t,  ĉ_t = r·k̂_{t-1} + s·Â_t</div>
+      <div><strong>Saddle-path initial condition:</strong> k̂_{-1}^{*} = −q/(p−ρ) × shock</div>
+      <div><strong>Intuition:</strong> Chooses k̂_{-1} so the explosive mode (∝ p^{t}) cancels, making IRFs bounded.</div>
+    `;
+    plotDiv.appendChild(info);
+  }
+
+  // Initial render
+  refreshParamsFromUI();
+  render(true);
+
+  return { destroy() {} };
+}
+
+    try {
+      var api = (typeof init === 'function') ? { init: init } : {};
+      if (api && typeof api.init === 'function') {
+        window.__ANIMS__['ch8_saddle_path_viz'] = { init: api.init };
+        console.log('[ANIM] Registered:', 'ch8_saddle_path_viz');
+      }
+    } catch (e) {
+      console.error('Failed to register animation ch8_saddle_path_viz', e);
     }
   })();
 
